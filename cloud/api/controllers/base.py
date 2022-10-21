@@ -1,8 +1,8 @@
-from aiohttp.web_urldispatcher import View
 from asyncpgsa import PG
+from aiohttp_pydantic import PydanticView
 
 
-class BaseView(View):
+class BaseView(PydanticView):
     URL_PATH: str
 
     @property

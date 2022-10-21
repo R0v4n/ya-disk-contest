@@ -1,10 +1,8 @@
 from sqlalchemy import (
-    Column, DateTime, Enum as PgEnum, ForeignKey, ForeignKeyConstraint, Integer,
-    String, Boolean, Table, MetaData
+    Column, DateTime, ForeignKey, ForeignKeyConstraint, Integer,
+    String, Table, MetaData, create_engine, select, literal, column, func, text
 )
-
-from cloud.api.model import NodeType
-
+from cloud.utils.pg import DEFAULT_PG_URL
 
 # todo: read about
 convention = {
@@ -34,34 +32,60 @@ metadata = MetaData(naming_convention=convention)
 imports = Table(
     'imports',
     metadata,
-    Column('import_id', Integer, primary_key=True),
-    Column('update_date', DateTime(timezone=True), nullable=False)
+    Column('id', Integer, primary_key=True),
+    Column('date', DateTime(timezone=True), nullable=False)
 )
 
-nodes = Table(
-    'nodes',
+folders = Table(
+    'folders',
     metadata,
-    Column('import_id', Integer, ForeignKey('imports.import_id')),
-           # primary_key=True),
-    Column('node_id', String, primary_key=True),
-    Column('parent_id', String, nullable=True),
-    Column('url', String, nullable=True),
-    Column('size', Integer, nullable=True),
-    Column('type', PgEnum(NodeType, name='type'), nullable=False),
-    Column('is_actual', Boolean, default=True, nullable=False),
-    ForeignKeyConstraint(('parent_id',), ('nodes.node_id',), ondelete='CASCADE')
+    Column('import_id', Integer, ForeignKey('imports.id')),
+    Column('id', String, primary_key=True),
+    Column('parent_id', String),
+    Column('size', Integer, default=0),
+    ForeignKeyConstraint(('parent_id',), ('folders.id',), ondelete='CASCADE')
 )
 
+files = Table(
+    'files',
+    metadata,
+    Column('import_id', Integer, ForeignKey('imports.id')),
+    Column('id', String, primary_key=True),
+    Column('parent_id', String, ForeignKey('folders.id', ondelete='CASCADE')),
+    Column('url', String(255), nullable=False),
+    Column('size', Integer, nullable=False),
+)
 
-# class Node(Base):
-#     __tablename__ = 'nodes'
-#
-#     import_id = Column(Integer, ForeignKey('imports.import_id'), primary_key=True)
-#     node_id = Column(String, primary_key=True)
-#     parent_id = Column(String, ForeignKey('nodes.node_id'), nullable=True)
-#     url = Column(String, nullable=True)
-#     size = Column(Integer, nullable=True)
-#     node_type = Column(PgEnum(NodeType, name='node_type'), nullable=False)
-#     is_actual = Column(Boolean, default=True, nullable=False)
-#
-#     children = relationship('nodes')
+folder_history = Table(
+    'folder_history',
+    metadata,
+    Column('import_id', Integer, ForeignKey('imports.id'), primary_key=True),
+    Column('folder_id', String, ForeignKey('folders.id', ondelete='CASCADE'), primary_key=True),
+    Column('parent_id', String),
+    Column('size', Integer, default=0),
+    ForeignKeyConstraint(('parent_id',), ('folders.id',), ondelete='CASCADE')
+)
+
+file_history = Table(
+    'file_history',
+    metadata,
+    Column('import_id', Integer, ForeignKey('imports.id'), primary_key=True),
+    Column('file_id', String, ForeignKey('files.id', ondelete='CASCADE'), primary_key=True),
+    Column('parent_id', String, ForeignKey('folders.id', ondelete='CASCADE')),
+    Column('url', String(255), nullable=False),
+    Column('size', Integer, nullable=False),
+)
+
+if __name__ == '__main__':
+    engine = create_engine(DEFAULT_PG_URL, echo=True)
+
+    parent_id = 'd515e43f-f3f6-4471-bb77-6b455017a2d2'
+    size = 50
+
+    from unit_test import UPDATE_IMPORT
+
+    ids = (item['id'] for item in UPDATE_IMPORT['items'])
+
+
+    # print(query)
+    # engine.execute(query)

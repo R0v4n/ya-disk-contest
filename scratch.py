@@ -1,19 +1,37 @@
-from dateutil import parser
-import dateutil
+import asyncio
+from dataclasses import dataclass
+from functools import reduce
+from typing import Iterable
 
-from cloud.api.model import NodeType
-from marshmallow import Schema, fields
-
-
-s = '2022-02-01T12:00:00Z'
-t = parser.parse(s)
+from cloud.utils.pg import DEFAULT_PG_URL
 
 
-class TestSchema(Schema):
-    title = fields.Str()
-    date = fields.DateTime()
+async def f():
+    await asyncio.sleep(2)
+    print('222')
+    return 1
 
 
-data = {'title':'name', 'date':s}
-a = TestSchema().load(data)
-print(a)
+async def f2():
+    await asyncio.sleep(5)
+    print('555')
+    return 1
+
+
+# loop = asyncio.get_event_loop()
+# f = asyncio.gather(f2(), f())
+# loop.run_until_complete(f)
+
+if __name__ == '__main__':
+    #
+    # import argparse
+    #
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('echo')
+    # args = parser.parse_args()
+    # print(args.echo)
+    # a, b = {1, 2}
+    # print(a, b)
+    from yarl import URL
+    url = URL(DEFAULT_PG_URL)
+    print(url, type(url))

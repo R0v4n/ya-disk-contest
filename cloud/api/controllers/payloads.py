@@ -4,9 +4,11 @@ from functools import partial
 
 from asyncpg import Record
 
+from cloud.api.model import NodeType
+
 
 # todo: refactor singledispathed
-def convert_asyncpg_record(value: Record):
+def convert_asyncpg_record(value):
     """
     Позволяет автоматически сериализовать результаты запроса, возвращаемые
     asyncpg.
@@ -16,6 +18,9 @@ def convert_asyncpg_record(value: Record):
 
     if type(value) == datetime:
         return str(value)
+
+    if type(value) == NodeType:
+        return value.value
 
     raise TypeError(f'Unserializable value: {value} of type: {type(value)}')
 

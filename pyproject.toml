@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cloud"
+dynamic = ["version", "dependencies", "optional-dependencies"]
+
+[project.scripts]
+cloud-api = "cloud.api.__main__:main"
+cloud-db = "cloud.db.__main__:main"
+
+# todo: add dev reqs and other stuff
+[tool.setuptools.dynamic]
+version = {attr = "cloud.__version__"}
+dependencies = {file = ["requirements.txt"]}
+optional-dependencies = {dev = { file = ["requirements.dev.txt"] }}

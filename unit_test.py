@@ -8,7 +8,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-API_BASEURL = "http://localhost:8080"
+from devtools import debug
+
+API_BASEURL = "http://localhost:8081"
 
 ROOT_ID = "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1"
 
@@ -84,6 +86,32 @@ IMPORT_BATCHES = [
         "updateDate": "2022-02-03T15:00:00Z"
     }
 ]
+
+UPDATE_IMPORT = {
+    "items": [
+        {
+            "type": "FILE",
+            "url": "/file/url1",
+            "id": "863e1a7a-1304-42ae-943b-179184c077e3",
+            "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
+            "size": 512
+        },
+        {
+            "type": "FILE",
+            "url": "/file/url2",
+            "id": "b1d8fd7d-2ae3-47d5-b2f9-0f094af800d4",
+            "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+            "size": 256
+        },
+        {
+            "type": "FOLDER",
+            "id": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
+            "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
+        }
+
+    ],
+    "updateDate": "2022-02-03T19:00:00Z"
+}
 
 EXPECTED_TREE = {
     "type": "FOLDER",
@@ -235,34 +263,41 @@ def test_nodes():
     print("Test nodes passed.")
 
 
-def test_updates():
+def test_updates(date=None):
+    date = date or "2022-02-04T00:00:00Z"
     params = urllib.parse.urlencode({
-        "date": "2022-02-04T00:00:00Z"
+        "date": date
     })
     status, response = request(f"/updates?{params}", json_response=True)
     assert status == 200, f"Expected HTTP status code 200, got {status}"
+    debug(response)
     print("Test updates passed.")
 
 
-def test_history():
+def test_history(node_id=None, ds=None, de=None):
+    node_id = node_id or ROOT_ID
+    ds = ds or "2022-02-01T00:00:00Z"
+    de = de or "2022-02-04T00:00:00Z"
     params = urllib.parse.urlencode({
-        "dateStart": "2022-02-01T00:00:00Z",
-        "dateEnd": "2022-02-03T00:00:00Z"
+        "dateStart": ds,
+        "dateEnd": de
     })
     status, response = request(
-        f"/node/{ROOT_ID}/history?{params}", json_response=True)
+        f"/node/{node_id}/history?{params}", json_response=True)
     assert status == 200, f"Expected HTTP status code 200, got {status}"
+    debug(response)
     print("Test stats passed.")
 
 
-def test_delete():
+def test_delete(node_id=None):
+    node_id = node_id or ROOT_ID
     params = urllib.parse.urlencode({
         "date": "2022-02-04T00:00:00Z"
     })
-    status, _ = request(f"/delete/{ROOT_ID}?{params}", method="DELETE")
+    status, _ = request(f"/delete/{node_id}?{params}", method="DELETE")
     assert status == 200, f"Expected HTTP status code 200, got {status}"
 
-    status, _ = request(f"/nodes/{ROOT_ID}", json_response=True)
+    status, _ = request(f"/nodes/{node_id}", json_response=True)
     assert status == 404, f"Expected HTTP status code 404, got {status}"
 
     print("Test delete passed.")
