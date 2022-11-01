@@ -1,5 +1,6 @@
 import pytest
 from alembic.command import upgrade
+from sqlalchemy import create_engine
 
 from cloud.api.__main__ import parser
 from cloud.api.app import create_app
@@ -37,3 +38,22 @@ async def api_client(aiohttp_client, arguments):
         yield client
     finally:
         await client.close()
+
+
+@pytest.fixture
+def migrated_postgres_sync_conn(migrated_postgres):
+    """
+    Синхронное соединение со смигрированной БД.
+    """
+    engine = create_engine(migrated_postgres)
+    conn = engine.connect()
+    try:
+        yield conn
+    finally:
+        conn.close()
+        engine.dispose()
+
+
+@pytest.fixture
+def generated_datasets():
+    pass

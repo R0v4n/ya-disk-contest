@@ -18,93 +18,20 @@ B2 = [
         "updateDate": "2022-03-01T12:00:00Z"
     }]
 
-IMPORT_BATCHES = [
-    {
-        "items": [
-            {
-                "type": "FOLDER",
-                "id": "d1",
-                "parentId": None
-            }
-        ],
-        "updateDate": "2022-02-01T12:00:00Z"
-    },
-    {
-        "items": [
-            {
-                "type": "FOLDER",
-                "id": "d2",
-                "parentId": "d1"
-            },
-            {
-                "type": "FILE",
-                "url": "/file/url1",
-                "id": "f1",
-                "parentId": "d2",
-                "size": 128
-            },
-            {
-                "type": "FILE",
-                "url": "/file/url2",
-                "id": "f2",
-                "parentId": "d2",
-                "size": 256
-            }
-        ],
-        "updateDate": "2022-02-02T12:00:00Z"
-    },
-    {
-        "items": [
-            {
-                "type": "FOLDER",
-                "id": "d3",
-                "parentId": "d1"
-            },
-            {
-                "type": "FILE",
-                "url": "/file/url3",
-                "id": "f3",
-                "parentId": "d3",
-                "size": 512
-            },
-            {
-                "type": "FILE",
-                "url": "/file/url4",
-                "id": "f4",
-                "parentId": "d3",
-                "size": 1024
-            }
-        ],
-        "updateDate": "2022-02-03T12:00:00Z"
-    },
-    {
-        "items": [
-            {
-                "type": "FILE",
-                "url": "/file/url5",
-                "id": "f5",
-                "parentId": "d3",
-                "size": 64
-            }
-        ],
-        "updateDate": "2022-02-03T15:00:00Z"
-    }
-]
-
 
 def test_nodes(node_id=None):
     node_id = node_id or ROOT_ID
     status, response = request(f"/nodes/{node_id}", json_response=True)
     print(status)
     debug(response)
-    json.dump(response, open('scratch.json', 'w'), ensure_ascii=False, indent=4)
+    # json.dump(response, open('scratch.json', 'w'), ensure_ascii=False, indent=4)
     # pprint(json.loads(response, indent=2, ensure_ascii=False))
 
 
 if __name__ == '__main__':
 
     test_import(None)
-    test_nodes('069cb8d7-bbdd-47d3-ad8f-82ef4c269df1')
+    # test_nodes('069cb8d7-bbdd-47d3-ad8f-82ef4c269df1')
 
     # test_import([UPDATE_IMPORT])
     # test_nodes('069cb8d7-bbdd-47d3-ad8f-82ef4c269df1')
@@ -124,5 +51,5 @@ if __name__ == '__main__':
 
     # test_nodes('069cb8d7-bbdd-47d3-ad8f-82ef4c269df1')
 
-    test_updates("2022-02-03T00:00:00Z")
+    # test_updates("2022-02-03T00:00:00Z")
     # test_history()

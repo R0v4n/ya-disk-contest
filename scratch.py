@@ -1,37 +1,29 @@
-import asyncio
-from dataclasses import dataclass
-from functools import reduce
-from typing import Iterable
+import time
+from datetime import datetime, timezone, timedelta
 
-from cloud.utils.pg import DEFAULT_PG_URL
-
-
-async def f():
-    await asyncio.sleep(2)
-    print('222')
-    return 1
+from devtools import debug
+from pydantic import BaseModel, Field
 
 
-async def f2():
-    await asyncio.sleep(5)
-    print('555')
-    return 1
+# d1 = {'1': 123, '11': '123', '22': datetime.utcnow()}
+# time.sleep(0.1)
+# d2 = {'11': '123', '1': 123, '21': datetime.utcnow()}
+# print(d1 == d2)
+# print(d1['22'])
+# print(d2['21'])
 
 
-# loop = asyncio.get_event_loop()
-# f = asyncio.gather(f2(), f())
-# loop.run_until_complete(f)
+class M(BaseModel):
+    x: int = Field(1)
+    y: int = Field(2)
 
-if __name__ == '__main__':
-    #
-    # import argparse
-    #
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('echo')
-    # args = parser.parse_args()
-    # print(args.echo)
-    # a, b = {1, 2}
-    # print(a, b)
-    from yarl import URL
-    url = URL(DEFAULT_PG_URL)
-    print(url, type(url))
+    class Config:
+        fields = {'x': {'exclude': True}}
+
+
+m = M(x=5, y=10)
+c = m.copy(update={'x': 3})
+debug(c)
+# debug(m.dict(include={'x'}))
+dt = datetime.now(timezone.utc)
+print(dt, dt + timedelta(seconds=1))

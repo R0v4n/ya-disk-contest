@@ -1,7 +1,10 @@
+from enum import Enum
+
 from sqlalchemy import (
     Column, DateTime, ForeignKey, ForeignKeyConstraint, Integer,
-    String, Table, MetaData, create_engine, select, literal, column, func, text
+    String, Table, MetaData, create_engine
 )
+
 from cloud.utils.pg import DEFAULT_PG_URL
 
 # todo: read about
@@ -26,17 +29,16 @@ convention = {
     'pk': 'pk__%(table_name)s'
 }
 metadata = MetaData(naming_convention=convention)
-# Base = declarative_base(metadata=metadata)
 
-
-imports = Table(
+# todo: DRY!
+imports_table = Table(
     'imports',
     metadata,
     Column('id', Integer, primary_key=True),
     Column('date', DateTime(timezone=True), nullable=False)
 )
 
-folders = Table(
+folders_table = Table(
     'folders',
     metadata,
     Column('import_id', Integer, ForeignKey('imports.id')),
@@ -46,7 +48,7 @@ folders = Table(
     ForeignKeyConstraint(('parent_id',), ('folders.id',), ondelete='CASCADE')
 )
 
-files = Table(
+files_table = Table(
     'files',
     metadata,
     Column('import_id', Integer, ForeignKey('imports.id')),
@@ -71,7 +73,7 @@ file_history = Table(
     metadata,
     Column('import_id', Integer, ForeignKey('imports.id'), primary_key=True),
     Column('file_id', String, ForeignKey('files.id', ondelete='CASCADE'), primary_key=True),
-    Column('parent_id', String, ForeignKey('folders.id', ondelete='CASCADE')),
+    Column('parent_id', String),
     Column('url', String(255), nullable=False),
     Column('size', Integer, nullable=False),
 )
@@ -85,7 +87,6 @@ if __name__ == '__main__':
     from unit_test import UPDATE_IMPORT
 
     ids = (item['id'] for item in UPDATE_IMPORT['items'])
-
 
     # print(query)
     # engine.execute(query)

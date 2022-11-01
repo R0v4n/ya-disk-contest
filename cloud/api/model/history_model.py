@@ -18,7 +18,7 @@ class HistoryModel:
         self.date_end = date_end
 
     async def get_files_updates_24h(self) -> list[dict[str, Any]]:
-        date_start = self.date_end - timedelta(1)
+        date_start = self.date_end - timedelta(days=1)
 
         query = FileQuery.select_updates_daterange(date_start, self.date_end)
 

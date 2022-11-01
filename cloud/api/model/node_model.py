@@ -2,16 +2,13 @@ from datetime import datetime
 from typing import Any
 
 from aiohttp.web_exceptions import HTTPNotFound
-from asyncpg import Record
 from asyncpgsa import PG
 from asyncpgsa.connection import SAConnection
-from pydantic import ValidationError
 
 from cloud.api.model.base_model import BaseModel
 from cloud.api.model.data_classes import NodeType, ExportNode
+from cloud.api.model.node_tree import ExportNodeTree
 from cloud.api.model.query_builder import FileQuery, FolderQuery, NodeQuery, ImportQuery
-from cloud.api.model.folder_tree import NodeTree
-
 from cloud.utils.pg import DEFAULT_PG_URL
 
 
@@ -42,7 +39,7 @@ class NodeModel(BaseModel):
             res += await self.conn.fetch(queries.file_children())
 
         # In general from_records returns a list[NodeTree]. In this case it will always be a single NodeTree list.
-        tree = NodeTree.from_records(res)[0]
+        tree = ExportNodeTree.from_records(res)[0]
 
         return tree.dict(by_alias=True)
 
@@ -58,7 +55,7 @@ class NodeModel(BaseModel):
         parents = query_class.recursive_parents(self.node_id)
         history_q = FolderQuery.insert_history_from_select(parents)
 
-        update_q = ImportQuery(file_id, folder_id, self.import_id).update_folders_size(add=False)
+        update_q = ImportQuery(file_id, folder_id, self.import_id).update_folder_sizes(add=False)
 
         await self.conn.execute(history_q)
         await self.conn.execute(update_q)
@@ -74,7 +71,7 @@ class NodeModel(BaseModel):
         }[node_type]
 
         query = query_class.select_nodes_union_history_in_daterange(date_start, date_end, self.node_id, closed=False)
-        print(query)
+
         res = await self.conn.fetch(query)
         nodes = [ExportNode(type=node_type, **rec).dict(by_alias=True) for rec in res]
 
@@ -95,6 +92,14 @@ if __name__ == '__main__':
             node = await mdl.get_node()
             debug(node)
 
+    async def get_file():
+        pg = PG()
+        await pg.init(DEFAULT_PG_URL)
+
+        async with pg.transaction() as conn:
+            mdl = NodeModel('863e1a7a-1304-42ae-943b-179184c077e3', conn)
+            node = await mdl.get_node()
+            debug(node)
 
     async def del_node():
         pg = PG()
@@ -111,15 +116,15 @@ if __name__ == '__main__':
         ds = datetime.fromisoformat('2021-10-03 12:00:00 +00:00')
         de = datetime.fromisoformat('2022-10-03 12:00:00 +00:00')
 
-
         async with pg.transaction() as conn:
             mdl = NodeModel('069cb8d7-bbdd-47d3-ad8f-82ef4c269df1', conn)
             nodes = await mdl.get_node_history(ds, de)
             debug(nodes)
 
     async def main():
-        # await get_node()
+        await get_node()
         # await del_node()
-        await node_history()
+        # await node_history()
+        # await get_file()
 
     asyncio.run(main())

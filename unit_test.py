@@ -10,82 +10,94 @@ import urllib.request
 
 from devtools import debug
 
+from tests.api.datasets import EXPECTED_TREE, IMPORT_BATCHES
+
 API_BASEURL = "http://localhost:8081"
 
 ROOT_ID = "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1"
 
-IMPORT_BATCHES = [
-    {
-        "items": [
+IMPORT2 = {
+        'items': [
             {
-                "type": "FOLDER",
-                "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
-                "parentId": None
-            }
-        ],
-        "updateDate": "2022-02-01T12:00:00Z"
-    },
-    {
-        "items": [
-            {
-                "type": "FOLDER",
-                "id": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
-                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1"
+                'id': 'eba2deaa-fdc6-468f-9d22-b061a2996d06',
+                'parentId': None,
+                'type': 'FOLDER',
+                'url': None,
+                'size': None,
             },
             {
-                "type": "FILE",
-                "url": "/file/url1",
-                "id": "863e1a7a-1304-42ae-943b-179184c077e3",
-                "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
-                "size": 128
+                'id': '0ac48492-ef89-4662-b7ca-b3aef9d021dd',
+                'parentId': 'eba2deaa-fdc6-468f-9d22-b061a2996d06',
+                'type': 'FILE',
+                'url': '/company/short.html',
+                'size': 9,
             },
             {
-                "type": "FILE",
-                "url": "/file/url2",
-                "id": "b1d8fd7d-2ae3-47d5-b2f9-0f094af800d4",
-                "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
-                "size": 256
-            }
-        ],
-        "updateDate": "2022-02-02T12:00:00Z"
-    },
-    {
-        "items": [
-            {
-                "type": "FOLDER",
-                "id": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1"
+                'id': '0da9559a-e7f8-41ea-a645-b5e2b15fb30b',
+                'parentId': 'eba2deaa-fdc6-468f-9d22-b061a2996d06',
+                'type': 'FILE',
+                'url': '/land/military.jpeg',
+                'size': 3,
             },
             {
-                "type": "FILE",
-                "url": "/file/url3",
-                "id": "98883e8f-0507-482f-bce2-2fb306cf6483",
-                "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                "size": 512
+                'id': '9af90060-3f8c-46c0-afaa-7c1bd9435bbe',
+                'parentId': None,
+                'type': 'FOLDER',
+                'url': None,
+                'size': None,
             },
             {
-                "type": "FILE",
-                "url": "/file/url4",
-                "id": "74b81fda-9cdc-4b63-8927-c978afed5cf4",
-                "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                "size": 1024
-            }
-        ],
-        "updateDate": "2022-02-03T12:00:00Z"
-    },
-    {
-        "items": [
+                'id': '93dd24b6-5b52-486c-aba1-89bd2f0799a9',
+                'parentId': '9af90060-3f8c-46c0-afaa-7c1bd9435bbe',
+                'type': 'FILE',
+                'url': '/property/foreign.tiff',
+                'size': 7,
+            },
             {
-                "type": "FILE",
-                "url": "/file/url5",
-                "id": "73bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                "size": 64
-            }
+                'id': 'fbb87982-2a76-4c8e-946c-e5a90c649f95',
+                'parentId': None,
+                'type': 'FILE',
+                'url': '/together/baby.wav',
+                'size': 2,
+            },
+            {
+                'id': '61c71f93-a6c8-4832-8d3d-b2eaa760adb9',
+                'parentId': '9af90060-3f8c-46c0-afaa-7c1bd9435bbe',
+                'type': 'FOLDER',
+                'url': None,
+                'size': None,
+            },
+            {
+                'id': '78f2f0ac-c5bb-40ef-9076-a31792b8e661',
+                'parentId': '61c71f93-a6c8-4832-8d3d-b2eaa760adb9',
+                'type': 'FILE',
+                'url': '/power/top.txt',
+                'size': 9,
+            },
+            {
+                'id': '6d80bce7-619a-4cbb-b459-db2cb6bdbdc3',
+                'parentId': '61c71f93-a6c8-4832-8d3d-b2eaa760adb9',
+                'type': 'FILE',
+                'url': '/although/clearly.webm',
+                'size': 6,
+            },
+            {
+                'id': 'cbb671de-c7dd-41c7-9df8-f5129234a778',
+                'parentId': '61c71f93-a6c8-4832-8d3d-b2eaa760adb9',
+                'type': 'FOLDER',
+                'url': None,
+                'size': None,
+            },
+            {
+                'id': '30e01a7b-16b1-4cb4-aa7b-d065cb8b499a',
+                'parentId': 'cbb671de-c7dd-41c7-9df8-f5129234a778',
+                'type': 'FILE',
+                'url': '/him/professional.odp',
+                'size': 8,
+            },
         ],
-        "updateDate": "2022-02-03T15:00:00Z"
+        'updateDate': '2022-10-29 06:00:22.915319+00:00',
     }
-]
 
 UPDATE_IMPORT = {
     "items": [
@@ -111,82 +123,6 @@ UPDATE_IMPORT = {
 
     ],
     "updateDate": "2022-02-03T19:00:00Z"
-}
-
-EXPECTED_TREE = {
-    "type": "FOLDER",
-    "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
-    "size": 1984,
-    "url": None,
-    "parentId": None,
-    "date": "2022-02-03T15:00:00Z",
-    "children": [
-        {
-            "type": "FOLDER",
-            "id": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-            "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
-            "size": 1600,
-            "url": None,
-            "date": "2022-02-03T15:00:00Z",
-            "children": [
-                {
-                    "type": "FILE",
-                    "url": "/file/url3",
-                    "id": "98883e8f-0507-482f-bce2-2fb306cf6483",
-                    "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                    "size": 512,
-                    "date": "2022-02-03T12:00:00Z",
-                    "children": None,
-                },
-                {
-                    "type": "FILE",
-                    "url": "/file/url4",
-                    "id": "74b81fda-9cdc-4b63-8927-c978afed5cf4",
-                    "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                    "size": 1024,
-                    "date": "2022-02-03T12:00:00Z",
-                    "children": None
-                },
-                {
-                    "type": "FILE",
-                    "url": "/file/url5",
-                    "id": "73bc3b36-02d1-4245-ab35-3106c9ee1c65",
-                    "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                    "size": 64,
-                    "date": "2022-02-03T15:00:00Z",
-                    "children": None
-                }
-            ]
-        },
-        {
-            "type": "FOLDER",
-            "id": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
-            "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
-            "size": 384,
-            "url": None,
-            "date": "2022-02-02T12:00:00Z",
-            "children": [
-                {
-                    "type": "FILE",
-                    "url": "/file/url1",
-                    "id": "863e1a7a-1304-42ae-943b-179184c077e3",
-                    "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
-                    "size": 128,
-                    "date": "2022-02-02T12:00:00Z",
-                    "children": None
-                },
-                {
-                    "type": "FILE",
-                    "url": "/file/url2",
-                    "id": "b1d8fd7d-2ae3-47d5-b2f9-0f094af800d4",
-                    "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
-                    "size": 256,
-                    "date": "2022-02-02T12:00:00Z",
-                    "children": None
-                }
-            ]
-        },
-    ]
 }
 
 
@@ -237,7 +173,7 @@ def print_diff(expected, response):
 
 
 def test_import(import_batches=None):
-    import_batches = import_batches or IMPORT_BATCHES
+    import_batches = import_batches or [IMPORT2]
     for index, batch in enumerate(import_batches):
         print(f"Importing batch {index}")
         status, _ = request("/imports", method="POST", data=batch)
@@ -294,6 +230,7 @@ def test_delete(node_id=None):
     params = urllib.parse.urlencode({
         "date": "2022-02-04T00:00:00Z"
     })
+
     status, _ = request(f"/delete/{node_id}?{params}", method="DELETE")
     assert status == 200, f"Expected HTTP status code 200, got {status}"
 

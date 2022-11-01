@@ -2,17 +2,16 @@ from abc import ABC
 from datetime import datetime, timedelta
 from typing import Iterable, Any
 
-from sqlalchemy import Table, select, func, exists
+from sqlalchemy import Table, select, func, exists, literal_column, String
 
-# from cloud.api.model import Node, Folder
-from cloud.db.schema import files, folder_history, folders, file_history, imports
+from cloud.api.model.data_classes import NodeType
+from cloud.db.schema import files_table, folder_history, folders_table, file_history, imports_table
 
 
 class QueryBase(ABC):
     table: Table
     history_table: Table
-
-    # NodeClass: type[Node]
+    node_type: NodeType
 
     @staticmethod
     def _build_columns(table: Table, columns: list[str | None] | None = None):
@@ -57,8 +56,8 @@ class QueryBase(ABC):
     # todo: move to other class
     @classmethod
     def select_join_date(cls, table: Table, condition=None, columns: list[str | None] | None = None):
-        query = select(cls._build_columns(table, columns) + [imports.c.date]). \
-            select_from(table.join(imports))
+        query = select(cls._build_columns(table, columns) + [imports_table.c.date]). \
+            select_from(table.join(imports_table))
         if condition is not None:
             query = query.where(condition)
 
@@ -66,6 +65,7 @@ class QueryBase(ABC):
 
     @classmethod
     def select_node_with_date(cls, node_id: str, columns: list[str | None] | None = None):
+        columns += [literal_column(f"'{cls.node_type.value}'", String).label('type')]
         return cls.select_join_date(cls.table, cls._ids_condition(cls.table, node_id), columns)
 
     @classmethod
@@ -90,17 +90,17 @@ class QueryBase(ABC):
 
         parents = \
             select([
-                folders.c.id,
-                folders.c.parent_id,
+                folders_table.c.id,
+                folders_table.c.parent_id,
                 func.sum(sign * exists.c.size).label('size')
             ]). \
                 select_from(
-                folders.join(
+                folders_table.join(
                     exists,
-                    folders.c.id == exists.c.parent_id
+                    folders_table.c.id == exists.c.parent_id
                 )
             ). \
-                group_by(folders.c.id, folders.c.parent_id)
+                group_by(folders_table.c.id, folders_table.c.parent_id)
 
         return parents
 
@@ -110,11 +110,11 @@ class QueryBase(ABC):
         exists = cls.select(ids, ['parent_id']).alias()
 
         parents = \
-            select(folders.columns). \
+            select(folders_table.columns). \
                 select_from(
-                folders.join(
+                folders_table.join(
                     exists,
-                    folders.c.id == exists.c.parent_id
+                    folders_table.c.id == exists.c.parent_id
                 )
             )
 
@@ -136,12 +136,12 @@ class QueryBase(ABC):
     def recursive_parents(cls, node_id: str, columns: list[str] = None):
 
         node_select = cls.select(node_id, ['parent_id']).alias()
-        first_parent_cte = select(cls._build_columns(folders, columns)). \
-            select_from(folders). \
-            where(folders.c.id == node_select). \
+        first_parent_cte = select(cls._build_columns(folders_table, columns)). \
+            select_from(folders_table). \
+            where(folders_table.c.id == node_select). \
             cte(recursive=True)
 
-        folders_alias = folders.alias()
+        folders_alias = folders_table.alias()
         included_alias = first_parent_cte.alias()
 
         parent_folders = first_parent_cte.union_all(
@@ -157,9 +157,9 @@ class QueryBase(ABC):
 
         select_q = cls.recursive_parents(node_id).alias()
 
-        query = folders.update(). \
-            where(folders.c.id == select_q.c.id). \
-            values(size=folders.c.size - size)
+        query = folders_table.update(). \
+            where(folders_table.c.id == select_q.c.id). \
+            values(size=folders_table.c.size - size)
 
         return query
 
@@ -171,8 +171,8 @@ class QueryBase(ABC):
 
         cols = set(union_cte.columns) - {union_cte.c.import_id}
 
-        condition = (imports.c.date <= date_end) if closed else (imports.c.date < date_end)
-        condition &= (date_start <= imports.c.date)
+        condition = (imports_table.c.date <= date_end) if closed else (imports_table.c.date < date_end)
+        condition &= (date_start <= imports_table.c.date)
         if ids:
             condition &= cls._ids_condition(union_cte, ids)
 
@@ -194,8 +194,9 @@ class QueryBase(ABC):
 
 
 class FolderQuery(QueryBase):
-    table = folders
+    table = folders_table
     history_table = folder_history
+    node_type = NodeType.FOLDER
 
     def __init__(self):
         raise NotImplementedError('This class is a functor. No need to create instance.')
@@ -232,6 +233,7 @@ class FolderQuery(QueryBase):
 
     @classmethod
     def recursive_children(cls, folder_id: str):
+        # todo: cols gets additional column 'type' in select_node_with_date. It's handles the task, but need refactor.
         cols = ['id', 'parent_id', 'size']
 
         top_folder = cls.select_node_with_date(
@@ -239,7 +241,7 @@ class FolderQuery(QueryBase):
             cols
         ).cte(recursive=True)
 
-        folders_alias = cls.select_join_date(folders, columns=cols).alias()
+        folders_alias = cls.select_join_date(folders_table, columns=cols).alias()
 
         children = top_folder.union_all(
             select(folders_alias.columns).
@@ -253,8 +255,9 @@ class FolderQuery(QueryBase):
 
 
 class FileQuery(QueryBase):
-    table = files
+    table = files_table
     history_table = file_history
+    node_type = NodeType.FILE
 
     def __init__(self):
         raise NotImplementedError('This class is a functor. No need to create instance.')
@@ -268,11 +271,10 @@ class ImportQuery:
         self.folder_ids = folder_ids
 
     @classmethod
-    def insert_import(cls, date):
-        return imports.insert().values({'date': date}).returning(imports.c.id)
+    def insert_import(cls, date: datetime):
+        return imports_table.insert().values({'date': date}).returning(imports_table.c.id)
 
     def recursive_parents_with_size(self, add: bool = True):
-        # fixme FileQuery...
         parents = \
             FileQuery.select_parents_with_size(self.file_ids, add). \
                 union_all(FolderQuery.select_parents_with_size(self.folder_ids, add)).alias()
@@ -285,7 +287,7 @@ class ImportQuery:
             select_from(parents). \
             group_by(parents.c.id, parents.c.parent_id).cte(recursive=True)
 
-        folders_alias = folders.alias()
+        folders_alias = folders_table.alias()
         parents_alias = parents_cte.alias()
 
         parents_recursive = parents_cte.union_all(
@@ -307,11 +309,11 @@ class ImportQuery:
 
         return all_parents
 
-    def update_folders_size(self, add: bool = True):
+    def update_folder_sizes(self, add: bool = True):
         select_q = self.recursive_parents_with_size(add).alias()
 
-        query = folders.update().where(folders.c.id == select_q.c.id).values(
-            size=select_q.c.size + folders.c.size, import_id=self.import_id)
+        query = folders_table.update().where(folders_table.c.id == select_q.c.id).values(
+            size=select_q.c.size + folders_table.c.size, import_id=self.import_id)
 
         return query
 
@@ -326,12 +328,12 @@ class ImportQuery:
         """
         files_parents = FileQuery.select_parents(self.file_ids)
 
-        parents_cte = folders. \
+        parents_cte = folders_table. \
             select(). \
-            where(folders.c.id.in_(ids)). \
+            where(folders_table.c.id.in_(ids)). \
             union(files_parents).alias().select().cte(recursive=True)
 
-        folders_alias = folders.alias()
+        folders_alias = folders_table.alias()
         parents_alias = parents_cte.alias()
 
         # todo: move cte to separate method?
@@ -351,7 +353,11 @@ class NodeQuery:
 
     def file_children(self):
         folders_select = FolderQuery.recursive_children(self.node_id).alias()
-        files_with_date = FileQuery.select_join_date(files, columns=['id', 'parent_id', 'size', 'url']).alias()
+
+        cols = ['id', 'parent_id', 'size', 'url']
+        cols += [literal_column(f"'{NodeType.FILE.value}'", String).label('type')]
+
+        files_with_date = FileQuery.select_join_date(files_table, columns=cols).alias()
         query = select(files_with_date.columns). \
             select_from(files_with_date.join(folders_select))
 
@@ -360,9 +366,10 @@ class NodeQuery:
 
 if __name__ == '__main__':
     # print(FileQuery.select_node_with_date('1', ['id', 'parent_id', 'url', 'size']))
-
     # print(FolderQuery.recursive_children('1'))
     # print(NodeQuery('1').file_children())
+    print(ImportQuery(['1', '11'], ['2', '3'], 1).update_folder_sizes(False))
+    exit()
     # print(FolderQuery.subtract_parents_size('1'))
     ds = datetime.fromisoformat('2022-02-01 12:00:00 +00:00')
     de = datetime.fromisoformat('2022-02-02 12:00:00 +00:00')

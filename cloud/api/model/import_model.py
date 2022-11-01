@@ -3,14 +3,14 @@ from __future__ import annotations
 from abc import ABC
 from functools import reduce
 
-from asyncpgsa import PG, compile_query
+from asyncpgsa import PG
 from asyncpgsa.connection import SAConnection
-from sqlalchemy import Table, bindparam
+from sqlalchemy import Table
 
-from cloud.api.model.data_classes import ImportData, File, Folder, Node
-from cloud.api.model.folder_tree import NodeTree
+from cloud.api.model.data_classes import ImportData, NodeType, ImportNode
+from cloud.api.model.node_tree import ExportNodeTree, ImportNodeTree
 from cloud.api.model.query_builder import FileQuery, FolderQuery, QueryBase, ImportQuery
-from cloud.db.schema import folders, files, file_history, folder_history
+from cloud.db.schema import folders_table, files_table
 from cloud.utils.pg import DEFAULT_PG_URL
 from .base_model import BaseModel
 
@@ -52,7 +52,7 @@ class ImportModel(BaseModel):
 
     async def subtract_parents_size(self):
         if self.files_mdl.exist_ids or self.folders_mdl.exist_ids:
-            await self.conn.execute(self.queries.update_folders_size(add=False))
+            await self.conn.execute(self.queries.update_folder_sizes(add=False))
 
     async def write_files_history(self):
         if self.files_mdl.exist_ids:
@@ -60,7 +60,6 @@ class ImportModel(BaseModel):
             await self.files_mdl.write_history(select_q)
 
     async def insert_new_nodes(self):
-        # todo: what about race???
         if self.folders_mdl.new_ids:
             await self.folders_mdl.insert_new()
         if self.files_mdl.new_ids:
@@ -74,7 +73,7 @@ class ImportModel(BaseModel):
 
     async def add_parents_size(self):
         # todo: do i need refactor?
-        query = ImportQuery(self.files_mdl.ids, self.folders_mdl.ids, self.import_id).update_folders_size()
+        query = ImportQuery(self.files_mdl.ids, self.folders_mdl.ids, self.import_id).update_folder_sizes()
 
         await self.conn.execute(query)
 
@@ -91,9 +90,10 @@ class ImportModel(BaseModel):
 
 
 class NodeListBaseModel(ABC):
-    NodeClass: type[Node]
+    # todo: add hasattr check. rename to factory? also with Query
+    NodeT: NodeType
+    # todo: refactor update query and remove table field
     table: Table
-    history_table: Table
     Query: type[QueryBase]
 
     def __init__(self, data: ImportData, import_id: int,
@@ -102,7 +102,7 @@ class NodeListBaseModel(ABC):
         self.conn = conn
         self.date = data.date
 
-        self.nodes = [i for i in data.items if type(i) == self.NodeClass]
+        self.nodes = [i for i in data.items if i.type == self.NodeT]
         self.ids = {node.id for node in self.nodes}
         self.new_ids = None
         self.exist_ids = None
@@ -126,16 +126,16 @@ class NodeListBaseModel(ABC):
     # todo: move to file class
     def _get_new_nodes_values(self):
         return [
-            node.dict() | {'import_id': self.import_id}
+            node.db_dict(self.import_id)
             for node in self.nodes
             if node.id in self.new_ids
         ]
 
     async def update_existing(self):
         # todo: need refactor
-        mapping = {key: f'${i}' for i, key in enumerate(self.NodeClass.__fields__.keys() | {'import_id'}, start=1)}
+        mapping = {key: f'${i}' for i, key in enumerate(ImportNode.db_fields_set(self.NodeT) | {'import_id'}, start=1)}
 
-        rows = [[(node.dict() | {'import_id': self.import_id})[key] for key in mapping] for node in self.nodes if
+        rows = [[(node.db_dict(self.import_id))[key] for key in mapping] for node in self.nodes if
                 node.id in self.exist_ids]
 
         id_param = mapping.pop('id')
@@ -148,8 +148,8 @@ class NodeListBaseModel(ABC):
     # todo: not used. remove or refactor
     async def update_existing1(self):
         # todo: move to Query?
-        bp_dict = {key: bindparam(key + '_') for key in self.NodeClass.__fields__} | {
-            'import_id': bindparam('import_id_')}
+        # bp_dict = {key: bindparam(key + '_') for key in self.NodeClass.__fields__} | {
+        #     'import_id': bindparam('import_id_')}
 
         # print(bp_dict)
         # {k + '_': v for k, v in node.dict()}
@@ -157,10 +157,10 @@ class NodeListBaseModel(ABC):
                 node.id in self.exist_ids]
         # rows = [list(d.values()) for d in rows]
         # print(rows)
-        query = self.Query.update(bp_dict)
+        # query = self.Query.update(bp_dict)
         # exit()
         #
-        a, b = compile_query(query)
+        # a, b = compile_query(query)
         # print(query)
         # a = 'UPDATE files SET import_id=$5, parent_id=$2, url=$3, size=$4 WHERE files.id = $1'
         # # print(rows)
@@ -174,26 +174,24 @@ class NodeListBaseModel(ABC):
 
 
 class FileListModel(NodeListBaseModel):
-    NodeClass = File
-    table = files
-    history_table = file_history
+    NodeT = NodeType.FILE
+    table = files_table
     Query = FileQuery
 
 
 class FolderListModel(NodeListBaseModel):
-    NodeClass = Folder
-    table = folders
-    history_table = folder_history
+    NodeT = NodeType.FOLDER
+    table = folders_table
     Query = FolderQuery
 
     def _get_new_nodes_values(self):
         new_folders = (node for node in self.nodes if node.id in self.new_ids)
 
-        folder_trees = NodeTree.from_nodes(new_folders)
+        folder_trees = ImportNodeTree.from_nodes(new_folders)
 
-        ordered_folders = sum((list(tree.flatten_nodes_dict_gen()) for tree in folder_trees), [])
+        ordered_folders = sum((list(tree.flatten_nodes_dict_gen(self.import_id)) for tree in folder_trees), [])
 
-        return [node_dict | {'import_id': self.import_id} for node_dict in ordered_folders]
+        return ordered_folders
 
 
 if __name__ == '__main__':
