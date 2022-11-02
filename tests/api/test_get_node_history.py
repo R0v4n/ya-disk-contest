@@ -6,7 +6,7 @@ from devtools import debug
 from cloud.utils.testing import post_import, FakeCloud, compare_db_fc_state, get_node_history, get_updates
 
 
-async def test_get_node_history(api_client, migrated_postgres_sync_conn):
+async def test_get_node_history(api_client, sync_connection):
 
     fake_cloud = FakeCloud()
 
@@ -57,6 +57,6 @@ async def test_get_node_history(api_client, migrated_postgres_sync_conn):
     expected_updates = fake_cloud.get_updates(date_end=date_end)
     received_updates = await get_updates(api_client, date_end)
 
-    compare_db_fc_state(migrated_postgres_sync_conn, fake_cloud)
+    compare_db_fc_state(sync_connection, fake_cloud)
     diff = DeepDiff(expected_updates, received_updates, ignore_order=True)
     assert diff == {}

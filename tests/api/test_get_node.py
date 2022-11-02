@@ -126,7 +126,7 @@ datasets = [
 
 # todo: add cases, use 2 params. refactor fake_cloud in fixture?
 @pytest.mark.parametrize('dataset', datasets)
-async def test_get_node(api_client, migrated_postgres_sync_conn, dataset):
+async def test_get_node(api_client, sync_connection, dataset):
     # fake_import = FakeImport(([5, [10, [2], [3, [5]]]],), ([[[2]]],))
     # dataset = fake_import.get_import_data()
     #
@@ -136,7 +136,7 @@ async def test_get_node(api_client, migrated_postgres_sync_conn, dataset):
 
     node_id = import_data['items'][0]['id']
 
-    import_dataset(migrated_postgres_sync_conn, import_data)
+    import_dataset(sync_connection, import_data)
 
     received_tree = await get_node(api_client, node_id)
     # todo: test DeepDiff
@@ -144,12 +144,12 @@ async def test_get_node(api_client, migrated_postgres_sync_conn, dataset):
     assert len(diff) == 0
 
 
-async def test_get_node_dynamic(api_client, migrated_postgres_sync_conn):
+async def test_get_node_dynamic(api_client, sync_connection):
 
     fake_cloud = FakeCloud()
     fake_cloud.generate_import(5, [10, [], [2], [3, [5]]], [], [[]], [2])
     import_data = fake_cloud.get_import_dict()
 
-    import_dataset(migrated_postgres_sync_conn, import_data)
+    import_dataset(sync_connection, import_data)
 
     await compare_db_fc_node_trees(api_client, fake_cloud)

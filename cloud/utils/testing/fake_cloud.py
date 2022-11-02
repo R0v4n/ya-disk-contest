@@ -15,7 +15,7 @@ from devtools import debug
 
 from cloud.api.model import NodeType
 
-fake = faker.Faker()
+fake = faker.Faker(use_weighting=False)
 
 
 class Item(pdt.BaseModel):
@@ -153,6 +153,7 @@ class Import(pdt.BaseModel):
 
 # todo: write tests for it!
 class FakeCloud:
+    faker = fake
 
     def __init__(self):
 
@@ -455,6 +456,7 @@ class FakeCloud:
 
 
 class FakeCloudGen(FakeCloud):
+    # todo: use faker instance
 
     @property
     def _folder_ids(self):
@@ -462,7 +464,7 @@ class FakeCloudGen(FakeCloud):
         return tuple(key for key, val in self._items.items() if type(val) == Folder)
 
     @staticmethod
-    def random_schema(max_depth=None, max_files=5):
+    def random_schema(max_files_in_one_folder=5, max_depth=None):
         def build(depth=1):
             if max_depth is None or depth < max_depth:
                 coin = rnd.choice(range(2))
@@ -472,14 +474,21 @@ class FakeCloudGen(FakeCloud):
             if coin:
                 return [build(depth + 1) for i in range(rnd.randint(0, 2))]
             else:
-                return rnd.randint(1, max_files)
+                return rnd.randint(1, max_files_in_one_folder)
 
         res = build()
 
         return [res] if isinstance(res, int) else res
 
-    def random_import(self):
-        self.generate_import(*self.random_schema(), parent_id=rnd.choice(self._folder_ids))
+    def random_import(self, *, max_schema_count=1, max_files_in_one_folder=5):
+        self.generate_import()
+
+        for _ in range(rnd.randint(0, max_schema_count)):
+            self.generate_import(
+                *self.random_schema(max_files_in_one_folder=max_files_in_one_folder),
+                parent_id=rnd.choice(self._folder_ids),
+                is_new=False
+            )
 
     def random_update(self):
         ids = set(self.ids) - self._imports[-1].items.keys()
@@ -501,10 +510,14 @@ class FakeCloudGen(FakeCloud):
             updates = rnd.choices(updates, k=rnd.randint(1, 3))
             self.update_item(id_, **dict(updates))
 
-    def random_updates(self, count=2):
+    def random_updates(self, *, count=2, allow_random_count=True):
         items_count = len(self._items) - 1 - len(self._imports[-1].items)
 
+        if allow_random_count:
+            count = rnd.randint(0, count)
+
         count = min(items_count, count)
+
         for _ in range(count):
             self.random_update()
 

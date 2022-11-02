@@ -82,7 +82,7 @@ class QueryBase(ABC):
     @classmethod
     def select_parents_with_size(cls, ids: Iterable[str], add: bool = True):
         """
-        Select strict parent folders for nodes with given ids.
+        Select direct parent folders for nodes with given ids.
         Third column in select is a total size of children with given ids for each parent.
         """
         exists = cls.select(ids, ['parent_id', 'size']).alias()
@@ -275,20 +275,25 @@ class ImportQuery:
         return imports_table.insert().values({'date': date}).returning(imports_table.c.id)
 
     def recursive_parents_with_size(self, add: bool = True):
-        parents = \
+        direct_parents = \
             FileQuery.select_parents_with_size(self.file_ids, add). \
                 union_all(FolderQuery.select_parents_with_size(self.folder_ids, add)).alias()
 
         parents_cte = select([
-            parents.c.id,
-            parents.c.parent_id,
-            func.sum(parents.c.size).label('size')
+            direct_parents.c.id,
+            direct_parents.c.parent_id,
+            func.sum(direct_parents.c.size).label('size')
         ]). \
-            select_from(parents). \
-            group_by(parents.c.id, parents.c.parent_id).cte(recursive=True)
+            select_from(direct_parents). \
+            group_by(direct_parents.c.id, direct_parents.c.parent_id).cte(recursive=True)
 
         folders_alias = folders_table.alias()
         parents_alias = parents_cte.alias()
+
+        join_condition = (folders_alias.c.id == parents_alias.c.parent_id)
+        if not add:
+            # if two nodes (one child of another) was moved from one branch.
+            join_condition &= ~ parents_alias.c.id.in_(self.folder_ids)
 
         parents_recursive = parents_cte.union_all(
             select([
@@ -296,7 +301,7 @@ class ImportQuery:
                 folders_alias.c.parent_id,
                 parents_alias.c.size
             ]).
-            select_from(folders_alias.join(parents_alias, folders_alias.c.id == parents_alias.c.parent_id))
+            select_from(folders_alias.join(parents_alias, join_condition))
         )
 
         all_parents = \

@@ -6,7 +6,7 @@ from devtools import debug
 from cloud.utils.testing import post_import, FakeCloud, compare_db_fc_state, get_node_history, get_updates
 
 
-async def test_get_updates(api_client, migrated_postgres_sync_conn):
+async def test_get_updates(api_client, sync_connection):
 
     fake_cloud = FakeCloud()
 
