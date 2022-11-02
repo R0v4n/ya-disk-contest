@@ -5,7 +5,7 @@ from http import HTTPStatus
 from aiohttp.test_utils import TestClient
 from aiohttp.web_urldispatcher import DynamicResource
 
-from cloud.api.controllers import ImportsView, NodeView, UpdatesView, NodeHistoryView, DeleteNodeView
+from cloud.api.view import ImportsView, NodeView, UpdatesView, NodeHistoryView, DeleteNodeView
 
 
 def url_for(path: str, path_params: dict = None, query_params: dict = None) -> str:

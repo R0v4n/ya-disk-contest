@@ -1,11 +1,7 @@
-from enum import Enum
-
 from sqlalchemy import (
     Column, DateTime, ForeignKey, ForeignKeyConstraint, Integer,
-    String, Table, MetaData, create_engine
+    String, Table, MetaData
 )
-
-from cloud.utils.pg import DEFAULT_PG_URL
 
 # todo: read about
 convention = {
@@ -77,16 +73,3 @@ file_history = Table(
     Column('url', String(255), nullable=False),
     Column('size', Integer, nullable=False),
 )
-
-if __name__ == '__main__':
-    engine = create_engine(DEFAULT_PG_URL, echo=True)
-
-    parent_id = 'd515e43f-f3f6-4471-bb77-6b455017a2d2'
-    size = 50
-
-    from unit_test import UPDATE_IMPORT
-
-    ids = (item['id'] for item in UPDATE_IMPORT['items'])
-
-    # print(query)
-    # engine.execute(query)

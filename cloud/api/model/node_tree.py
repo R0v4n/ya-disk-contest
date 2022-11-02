@@ -2,15 +2,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from datetime import datetime
 # todo: install python 3.11 and use Self
 from typing import Iterable, Mapping, Any, TypeVar  # , Self
 
-from asyncpg import Record
-from devtools import debug
 # todo: fix imports path everywhere
 from cloud.api.model.data_classes import ImportNode, NodeType, ExportNode, Node
-
 
 TNodeModel = TypeVar('TNodeModel', bound=Node)
 
@@ -78,31 +74,3 @@ class ImportNodeTree(ImportNode, TreeMixin):
                     yield from get_dict(child)
 
         return get_dict(self)
-
-
-if __name__ == '__main__':
-    from unit_test import EXPECTED_TREE
-
-    d = {
-        'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-        'parent_id': None,
-        'type': NodeType.FILE,
-        'size': 10,
-        'url': 'apch-hi'
-    }
-    tree = ImportNodeTree.from_records([d])[0]
-
-    debug(tree.db_dict(1))
-    debug(tree.flatten_nodes_dict_gen(1))
-    # exit()
-
-
-    def this_is_tree():
-        tree = ExportNodeTree(**EXPECTED_TREE)
-        debug(tree.dict())
-        # debug(tree.flatten_nodes_dict_gen(1))
-        # with open('../model_scratch.json', mode='w') as f:
-        #     f.write(tree.json(indent=4))
-
-
-    this_is_tree()

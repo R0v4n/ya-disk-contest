@@ -14,6 +14,7 @@ import pydantic as pdt
 from devtools import debug
 
 from cloud.api.model import NodeType
+from tests.api.datasets import IMPORT_BATCHES
 
 fake = faker.Faker(use_weighting=False)
 
@@ -532,7 +533,6 @@ class FakeCloudGen(FakeCloud):
 
 if __name__ == '__main__':
     def some_load():
-        from unit_test import IMPORT_BATCHES
         fc = FakeCloud()
         for batch in IMPORT_BATCHES:
             fc.load_import(batch)

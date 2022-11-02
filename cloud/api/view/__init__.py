@@ -1,4 +1,4 @@
-from .controllers import ImportsView, NodeView, UpdatesView, DeleteNodeView, NodeHistoryView
+from .views import ImportsView, NodeView, UpdatesView, DeleteNodeView, NodeHistoryView
 
 CONTROLLERS = (
     ImportsView,

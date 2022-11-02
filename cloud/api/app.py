@@ -4,7 +4,7 @@ from functools import partial
 from aiohttp.web_app import Application
 
 from cloud.utils.pg import pg_context
-from .controllers import CONTROLLERS
+from .view import CONTROLLERS
 
 
 # todo: add logging

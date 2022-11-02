@@ -4,7 +4,6 @@ from datetime import datetime
 from enum import Enum
 
 import pydantic as pdt
-from devtools import debug
 
 
 class NodeType(Enum):
@@ -71,12 +70,3 @@ class ImportData(pdt.BaseModel):
             raise ValueError("ids should be unique in one import.")
 
         return items
-
-
-if __name__ == '__main__':
-
-    from unit_test import IMPORT_BATCHES
-
-    for b in IMPORT_BATCHES:
-        debug(b)
-        debug(ImportData(**b))

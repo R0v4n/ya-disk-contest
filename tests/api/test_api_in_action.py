@@ -15,11 +15,11 @@ async def test_api_in_action(api_client, sync_connection):
 
     await post_import(api_client, import_data)
 
-    n = 10000
+    n = 100
     check_count = 100
     check_step = n // check_count
 
-    for step in range(n):
+    for step in range(1, n+1):
         fake_cloud.random_import(max_schema_count=4, max_files_in_one_folder=2)
         fake_cloud.random_updates(count=5)
 
@@ -33,7 +33,7 @@ async def test_api_in_action(api_client, sync_connection):
             if id_:
                 await del_node(api_client, id_, date)
 
-        if step % check_step == 0 or step == n - 1:
+        if step % check_step == 0:
             print(f'step={step}, node_count={len(fake_cloud.ids)}')
             # debug(fake_cloud.get_tree())
             try:

@@ -3,15 +3,13 @@ from __future__ import annotations
 from abc import ABC
 from functools import reduce
 
-from asyncpgsa import PG
 from asyncpgsa.connection import SAConnection
 from sqlalchemy import Table
 
 from cloud.api.model.data_classes import ImportData, NodeType, ImportNode
-from cloud.api.model.node_tree import ExportNodeTree, ImportNodeTree
+from cloud.api.model.node_tree import ImportNodeTree
 from cloud.api.model.query_builder import FileQuery, FolderQuery, QueryBase, ImportQuery
 from cloud.db.schema import folders_table, files_table
-from cloud.utils.pg import DEFAULT_PG_URL
 from .base_model import BaseModel
 
 
@@ -192,40 +190,3 @@ class FolderListModel(NodeListBaseModel):
         ordered_folders = sum((list(tree.flatten_nodes_dict_gen(self.import_id)) for tree in folder_trees), [])
 
         return ordered_folders
-
-
-if __name__ == '__main__':
-    import asyncio
-    from unit_test import IMPORT_BATCHES, UPDATE_IMPORT
-
-
-    async def some_new_imports():
-        pg = PG()
-        await pg.init(DEFAULT_PG_URL)
-
-        async with pg.transaction() as conn:
-            for i, batch in enumerate(IMPORT_BATCHES):
-                data = ImportData(**batch)
-                mdl = ImportModel(data, conn)
-                await mdl.init()
-                await mdl.just_do_it()
-
-
-    async def update_import():
-        pg = PG()
-        await pg.init(DEFAULT_PG_URL)
-
-        async with pg.transaction() as conn:
-            data = ImportData(**UPDATE_IMPORT)
-
-            mdl = ImportModel(data, conn)
-            await mdl.init()
-            await mdl.just_do_it()
-
-
-    async def main():
-        await some_new_imports()
-        # await update_import()
-
-
-    asyncio.run(main())
