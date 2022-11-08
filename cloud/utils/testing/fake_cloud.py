@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import json
 import random
-import time
+import random as rnd
 from datetime import datetime, timezone, timedelta
 from itertools import groupby
-import random as rnd
 from typing import Any
 from uuid import UUID
 
@@ -14,7 +12,6 @@ import pydantic as pdt
 from devtools import debug
 
 from cloud.api.model import NodeType
-from tests.api.datasets import IMPORT_BATCHES
 
 fake = faker.Faker(use_weighting=False)
 
@@ -166,14 +163,14 @@ class FakeCloud:
     def generate_import(
             self,
             *tree_schemas: list[list | int] | int,
-            date: datetime = None,
+            date: datetime | str = None,
             parent_id: str | None = None,
             is_new=True) -> int:
         """
         :param tree_schemas:
             list representing folder, int - number of files ([] - empty folder, [2] - folder with two files).
-            e.g. generate_trees(2, [1,[3]]) will generate 2 files with parent_id = top_nodes_parent_id,
-            "folder1" with parent_id = top_nodes_parent_id,
+            e.g. generate_trees(2, [1,[3]]) will generate 2 files with parent_id = param parent_id,
+            "folder1" with parent_id = param parent_id,
             file with parent_id = folder1.id,
             "folder2" with parent_id = folder1.id,
             3 files with parent_id = folder2.id.
@@ -183,7 +180,7 @@ class FakeCloud:
         :param parent_id:
             parent id for top nodes in each tree schema.
         :param is_new:
-            if True generates new import, otherwise appends in last import (date param is not used in second case).
+            if True generates new import, otherwise appends last import (date param is not used in second case).
 
         :return import id
 
@@ -229,11 +226,26 @@ class FakeCloud:
             item_type = Folder if item_dict['type'] == NodeType.FOLDER.value else File
             f = item_type(**item_dict, date=date, import_id=import_id)
 
+            if f.size is None:
+                f.size = 0
+
             if f.id in self._items:
                 self.update_item(f.id, **f.dict(include=f.Config.updates_allowed))
             else:
                 self._insert_new_item(f)
                 self._update_parents(f.parent_id, f.size)
+
+    def insert_item(self, item: Item):
+        item = item.copy()
+
+        if item.id in self.ids:
+            raise ValueError('Item already exist.')
+
+        item.date = self._imports[-1].date
+        item.import_id = self._imports[-1].id
+
+        self._insert_new_item(item)
+        self._update_parents(item.parent_id, item.size)
 
     def update_item(self, id_: str, **fields: Any):
         item = self._items.get(id_)
@@ -290,6 +302,9 @@ class FakeCloud:
         ]
 
         return {'items': items}
+
+    def get_all_history(self):
+        return [item.export_dict for item in self._history]
 
     def get_updates(self, date_start: datetime = None, date_end: datetime = None):
         date_end = date_end or datetime.now(timezone.utc)
@@ -355,6 +370,22 @@ class FakeCloud:
         node = node.shallow_copy()
         return node
 
+    def __getitem__(self, item: int | tuple[int, ...]):
+        if isinstance(item, int):
+            item = item,
+
+        it = iter(item)
+
+        node = self._root.children[next(it)]
+
+        for i in it:
+            try:
+                node = node.children[i]
+            except (IndexError, TypeError):
+                raise IndexError('Node does not exist.')
+
+        return node.shallow_copy()
+
     def get_raw_db_imports_records(self) -> list[dict[str, str]]:
         return [i.dict(include={'id', 'date'}) for i in self._imports]
 
@@ -378,6 +409,13 @@ class FakeCloud:
     @property
     def ids(self):
         return tuple(key for key in self._items.keys() if key is not None)
+
+    @property
+    def last_import_date(self):
+        if not self._imports:
+            return None
+
+        return self._imports[-1].date
 
     def _pop_from_children(self, child: Item):
         parent = self._items[child.parent_id]
@@ -410,7 +448,8 @@ class FakeCloud:
         return self._imports[-1].id
 
     def _get_import_data(self, import_id: int = None) -> Import:
-        import_id = import_id or -1
+        if import_id is None:
+            import_id = -1
         try:
             import_data = self._imports[import_id]
         except IndexError:
@@ -532,13 +571,6 @@ class FakeCloudGen(FakeCloud):
 
 
 if __name__ == '__main__':
-    def some_load():
-        fc = FakeCloud()
-        for batch in IMPORT_BATCHES:
-            fc.load_import(batch)
-
-        debug(fc.get_tree())
-
 
     def some_generation():
         fc = FakeCloud()

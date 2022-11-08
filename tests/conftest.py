@@ -3,11 +3,11 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import create_engine
 from sqlalchemy_utils import create_database, drop_database
 from yarl import URL
 
 from cloud.utils.pg import DEFAULT_PG_URL, make_alembic_config
+from cloud.utils.testing import FakeCloud
 
 # fixme: CI?
 PG_URL = os.getenv('CLOUD_PG_URL', DEFAULT_PG_URL)
@@ -28,6 +28,7 @@ def postgres():
 @pytest.fixture
 def alembic_config(postgres):
     # todo: what is x?
+
     cmd_options = SimpleNamespace(
         config='alembic.ini',
         name='alembic',
@@ -35,4 +36,13 @@ def alembic_config(postgres):
         raiseerr=False,
         x=None
     )
-    return make_alembic_config(cmd_options)
+    config = make_alembic_config(cmd_options)
+
+    # fixme: this does not work
+    config.set_section_option("logger_alembic", "level", "ERROR")
+    return config
+
+
+@pytest.fixture
+def fake_cloud():
+    return FakeCloud()

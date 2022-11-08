@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from abc import ABC
 from functools import reduce
+from typing import Iterable
 
+from aiohttp.web_exceptions import HTTPBadRequest
+from asyncpg import ForeignKeyViolationError
 from asyncpgsa.connection import SAConnection
 from sqlalchemy import Table
 
-from cloud.api.model.data_classes import ImportData, NodeType, ImportNode
+from cloud.api.model.data_classes import ImportData, NodeType, ImportNode, ParentIdValidationError
 from cloud.api.model.node_tree import ImportNodeTree
 from cloud.api.model.query_builder import FileQuery, FolderQuery, QueryBase, ImportQuery
 from cloud.db.schema import folders_table, files_table
@@ -15,10 +18,10 @@ from .base_model import BaseModel
 
 class ImportModel(BaseModel):
 
-    def __init__(self, data: ImportData, conn: SAConnection):
+    def __init__(self, data: ImportData, pg: SAConnection):
 
         self.data = data
-        super().__init__(conn, data.date)
+        super().__init__(pg, data.date)
 
         self.files_mdl: FileListModel | None = None
         self.folders_mdl: FolderListModel | None = None
@@ -32,6 +35,10 @@ class ImportModel(BaseModel):
 
         self.files_mdl = FileListModel(self.data, self.import_id, self.conn)
         await self.files_mdl.init()
+
+        if await self.files_mdl.any_id_exists(self.folders_mdl.ids) \
+                or await self.folders_mdl.any_id_exists(self.files_mdl.ids):
+            raise HTTPBadRequest
 
         self.queries = ImportQuery(self.files_mdl.exist_ids, self.folders_mdl.exist_ids, self.import_id)
 
@@ -115,11 +122,14 @@ class NodeListBaseModel(ABC):
 
         return {row['id'] for row in res}
 
-    # async def get_new_ids(self):
-    #     return self.ids - (await self.existing_ids)
+    async def any_id_exists(self, ids: Iterable[str]):
+        return await self.conn.fetchval(self.Query.exist(ids))
 
     async def insert_new(self):
-        await self.conn.execute(self.Query.insert(self._get_new_nodes_values()))
+        try:
+            await self.conn.execute(self.Query.insert(self._get_new_nodes_values()))
+        except ForeignKeyViolationError as err:
+            raise ParentIdValidationError(err.detail or '')
 
     # todo: move to file class
     def _get_new_nodes_values(self):
@@ -141,7 +151,12 @@ class NodeListBaseModel(ABC):
         cols = ', '.join(f'{key}={val}' for key, val in mapping.items())
 
         query = f'UPDATE {self.table.name} SET {cols} WHERE id = {id_param}'
-        await self.conn.executemany(query, rows)
+
+        try:
+            await self.conn.executemany(query, rows)
+        # fixme: this can be a problem if FK error will be raised due to node id.
+        except ForeignKeyViolationError as err:
+            raise ParentIdValidationError(err.detail or '')
 
     # todo: not used. remove or refactor
     async def update_existing1(self):

@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 
 from cloud.api.__main__ import parser
 from cloud.api.app import create_app
+from cloud.utils.testing import FakeCloud, post_import
 
 
 @pytest.fixture
@@ -43,7 +44,7 @@ async def api_client(aiohttp_client, arguments):
 @pytest.fixture
 def sync_connection(migrated_postgres):
     """
-    Синхронное соединение со смигрированной БД.
+    sync connection to migrated db.
     """
     engine = create_engine(migrated_postgres)
     conn = engine.connect()
@@ -54,6 +55,4 @@ def sync_connection(migrated_postgres):
         engine.dispose()
 
 
-@pytest.fixture
-def generated_datasets():
-    pass
+

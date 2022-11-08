@@ -4,6 +4,11 @@ from datetime import datetime
 from enum import Enum
 
 import pydantic as pdt
+from pydantic import Extra
+
+
+class ParentIdValidationError(ValueError):
+    pass
 
 
 class NodeType(Enum):
@@ -64,9 +69,17 @@ class ImportData(pdt.BaseModel):
     items: list[ImportNode]
     date: datetime = pdt.Field(alias='updateDate')
 
+    class Config:
+        extra = Extra.forbid
+
     @pdt.validator('items')
     def check_unique(cls, items):
         if len(items) > len({item.id for item in items}):
             raise ValueError("ids should be unique in one import.")
 
         return items
+
+
+# todo: how to use it?
+class Error(pdt.BaseModel):
+    error: str
