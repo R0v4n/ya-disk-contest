@@ -18,10 +18,10 @@ from .base_model import BaseModel
 
 class ImportModel(BaseModel):
 
-    def __init__(self, data: ImportData, conn: SAConnection):
+    def __init__(self, data: ImportData, pg: SAConnection):
 
         self.data = data
-        super().__init__(conn, data.date)
+        super().__init__(pg, data.date)
 
         self.files_mdl: FileListModel | None = None
         self.folders_mdl: FolderListModel | None = None
