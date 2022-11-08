@@ -15,10 +15,8 @@ class ImportsView(BasePydanticView):
     ModelT = ImportModel
 
     async def post(self, data: ImportData):
-        async with self.pg.transaction() as conn:
-            mdl = self.ModelT(data, conn)
-            await mdl.init()
-            await mdl.just_do_it()
+        mdl = self.ModelT(data, self.pg)
+        await mdl.execute_post_import()
         return Response()
 
 
@@ -26,23 +24,15 @@ class NodeView(BasePydanticView):
     URL_PATH = r'/nodes/{node_id}'
 
     async def get(self, node_id: str, /) -> Union[r200[ExportNodeTree], r404[Error]]:
-        async with self.pg.transaction() as conn:
-            mdl = NodeModel(node_id, conn)
-            node = await mdl.get_node()
-
+        node = await NodeModel(node_id, self.pg).get_node()
         return json_response(node, dumps=dumps)
 
 
 class DeleteNodeView(BasePydanticView):
     URL_PATH = r'/delete/{node_id}'
 
-    # todo: date validation?
     async def delete(self, node_id: str, /, date: datetime):
-
-        async with self.pg.transaction() as conn:
-            mdl = NodeModel(node_id, conn, date)
-            await mdl.delete_node()
-
+        await NodeModel(node_id, self.pg, date).execute_del_node()
         return Response()
 
 
@@ -61,9 +51,8 @@ class NodeHistoryView(BasePydanticView):
 
     # noinspection PyPep8Naming
     async def get(self, node_id: str, /, dateStart: datetime, dateEnd: datetime):
-        async with self.pg.transaction() as conn:
 
-            mdl = NodeModel(node_id, conn)
-            nodes = await mdl.get_node_history(dateStart, dateEnd)
+        mdl = NodeModel(node_id, self.pg)
+        nodes = await mdl.get_node_history(dateStart, dateEnd)
 
         return json_response({'items': nodes}, dumps=dumps)

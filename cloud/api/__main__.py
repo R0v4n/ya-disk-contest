@@ -39,9 +39,9 @@ group.add_argument('--api-port', type=positive_int, default=8081,
 group = parser.add_argument_group('PostgreSQL options')
 group.add_argument('--pg-url', type=URL, default=URL(DEFAULT_PG_URL),
                    help='URL to use to connect to the database')
-group.add_argument('--pg-pool-min-size', type=int, default=10,
+group.add_argument('--pg-pool-min-size', type=int, default=20,
                    help='Minimum database connections')
-group.add_argument('--pg-pool-max-size', type=int, default=10,
+group.add_argument('--pg-pool-max-size', type=int, default=20,
                    help='Maximum database connections')
 
 # group = parser.add_argument_group('Logging options')

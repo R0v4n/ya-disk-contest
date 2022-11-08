@@ -15,11 +15,11 @@ async def test(api_client, sync_connection):
     await post_import(api_client, import_data)
 
     n = 100
-    check_count = 50
+    check_count = 10
     check_step = n // check_count
 
     for step in range(1, n+1):
-        fake_cloud.random_import(max_schema_count=8, max_files_in_one_folder=3)
+        fake_cloud.random_import(schemas_count=8, max_files_in_one_folder=3)
         fake_cloud.random_updates(count=6)
 
         import_data = fake_cloud.get_import_dict()

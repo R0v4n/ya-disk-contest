@@ -6,6 +6,7 @@ from typing import Iterable
 
 from aiohttp.web_exceptions import HTTPBadRequest
 from asyncpg import ForeignKeyViolationError
+from asyncpgsa import PG
 from asyncpgsa.connection import SAConnection
 from sqlalchemy import Table
 
@@ -13,12 +14,12 @@ from cloud.api.model.data_classes import ImportData, NodeType, ImportNode, Paren
 from cloud.api.model.node_tree import ImportNodeTree
 from cloud.api.model.query_builder import FileQuery, FolderQuery, QueryBase, ImportQuery
 from cloud.db.schema import folders_table, files_table
-from .base_model import BaseModel
+from .base_model import BaseImportModel
 
 
-class ImportModel(BaseModel):
+class ImportModel(BaseImportModel):
 
-    def __init__(self, data: ImportData, pg: SAConnection):
+    def __init__(self, data: ImportData, pg: PG):
 
         self.data = data
         super().__init__(pg, data.date)
@@ -82,16 +83,16 @@ class ImportModel(BaseModel):
 
         await self.conn.execute(query)
 
-    async def just_do_it(self):
-        await self.write_folders_history()
-        await self.write_files_history()
-
-        await self.subtract_parents_size()
-
-        await self.insert_new_nodes()
-        await self.update_existing_nodes()
-
-        await self.add_parents_size()
+    async def execute_post_import(self):
+        await self.execute_in_transaction(
+            self.init,
+            self.write_folders_history,
+            self.write_files_history,
+            self.subtract_parents_size,
+            self.insert_new_nodes,
+            self.update_existing_nodes,
+            self.add_parents_size
+        )
 
 
 class NodeListBaseModel(ABC):

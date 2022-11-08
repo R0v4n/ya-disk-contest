@@ -328,11 +328,19 @@ class FakeCloud:
         return {'items': items}
 
     def get_import_dict(self, import_id: int = None):
+        """
+        first import always has id = 1.
+        :param import_id: if None returns last import data. Can be negative value (-1 is last import data)
+        :return: import data dict formatted according to API spec.
+        """
         data = self._get_import_data(import_id)
         return {
             'items': [item.import_dict for item in data.items.values()],
             'updateDate': str(data.date)
         }
+
+    def imports_gen(self):
+        return (self.get_import_dict(i.id) for i in self._imports)
 
     def get_node_copy(self, path: str) -> Item:
 
@@ -450,12 +458,13 @@ class FakeCloud:
     def _get_import_data(self, import_id: int = None) -> Import:
         if import_id is None:
             import_id = -1
-        try:
-            import_data = self._imports[import_id]
-        except IndexError:
+
+        if import_id > len(self._imports) or import_id == 0 or import_id < - len(self._imports):
             raise ValueError(f'Import with id = {import_id} does not exist')
         else:
-            return import_data
+            if import_id > 0:
+                import_id -= 1
+            return self._imports[import_id]
 
     def _insert_new_item(self, item: Item):
         self._items[item.id] = item
@@ -520,10 +529,13 @@ class FakeCloudGen(FakeCloud):
 
         return [res] if isinstance(res, int) else res
 
-    def random_import(self, *, max_schema_count=1, max_files_in_one_folder=5):
+    def random_import(self, *, schemas_count=1, allow_random_count=True, max_files_in_one_folder=5):
         self.generate_import()
 
-        for _ in range(rnd.randint(0, max_schema_count)):
+        if allow_random_count:
+            schemas_count = rnd.randint(0, schemas_count)
+
+        for _ in range(schemas_count):
             self.generate_import(
                 *self.random_schema(max_files_in_one_folder=max_files_in_one_folder),
                 parent_id=rnd.choice(self._folder_ids),
@@ -571,7 +583,6 @@ class FakeCloudGen(FakeCloud):
 
 
 if __name__ == '__main__':
-
     def some_generation():
         fc = FakeCloud()
         fc.generate_import([2], [1], 1)

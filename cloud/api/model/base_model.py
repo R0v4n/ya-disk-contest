@@ -1,24 +1,38 @@
+from abc import abstractmethod
 from datetime import datetime
+from typing import Callable, Coroutine
 
 from aiohttp.web_exceptions import HTTPBadRequest
+from asyncpgsa import PG
 from asyncpgsa.connection import SAConnection
 
 from .query_builder import ImportQuery
 
 
-class BaseModel:
-    def __init__(self, conn: SAConnection, date: datetime | None):
+class BaseImportModel:
+    def __init__(self, pg: PG, date: datetime | None):
         # todo: date is None in some cases. need check and refactor probably
         if date is not None and date.tzinfo is None:
             raise HTTPBadRequest
 
-        self._conn = conn
+        self.pg = pg
         self._date = date
 
+        self._conn = None
         self._import_id = None
 
+    async def execute_in_transaction(self, *methods):
+        async with self.pg.transaction() as conn:
+            self._conn = conn
+            for m in methods:
+                await m()
+
+        self._conn = None
+
     @property
-    def conn(self):
+    def conn(self) -> SAConnection:
+        if self._conn is None:
+            raise AttributeError(f'Any method using connection should be passed to self.execute_in_transaction.')
         return self._conn
 
     @property

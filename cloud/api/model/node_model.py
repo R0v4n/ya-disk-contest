@@ -5,22 +5,22 @@ from aiohttp.web_exceptions import HTTPNotFound
 from asyncpgsa import PG
 from asyncpgsa.connection import SAConnection
 
-from cloud.api.model.base_model import BaseModel
+from cloud.api.model.base_model import BaseImportModel
 from cloud.api.model.data_classes import NodeType, ExportNode
 from cloud.api.model.node_tree import ExportNodeTree
 from cloud.api.model.query_builder import FileQuery, FolderQuery, NodeQuery, ImportQuery
 from cloud.utils.pg import DEFAULT_PG_URL
 
 
-class NodeModel(BaseModel):
-    def __init__(self, node_id: str, conn: SAConnection, date: datetime | None = None):
+class NodeModel(BaseImportModel):
+    def __init__(self, node_id: str, pg: PG, date: datetime | None = None):
 
-        super().__init__(conn, date)
+        super().__init__(pg, date)
         self.node_id = node_id
 
-    async def get_node_type(self) -> NodeType:
+    async def _get_node_type(self, conn) -> NodeType:
         for q, t in zip([FileQuery, FolderQuery], NodeType):
-            node_exists = await self.conn.fetchval(q.exist(self.node_id))
+            node_exists = await conn.fetchval(q.exist(self.node_id))
 
             if node_exists:
                 return t
@@ -28,26 +28,26 @@ class NodeModel(BaseModel):
         raise HTTPNotFound()
 
     async def get_node(self) -> dict[str, Any]:
-        if await self.get_node_type() == NodeType.FILE:
+        if await self._get_node_type(self.pg) == NodeType.FILE:
             query = FileQuery.select_node_with_date(self.node_id, ['id', 'parent_id', 'url', 'size'])
-            res = [await self.conn.fetchrow(query)]
+            res = [await self.pg.fetchrow(query)]
 
         else:
             queries = NodeQuery(self.node_id)
 
-            res = await self.conn.fetch(queries.folder_children())
-            res += await self.conn.fetch(queries.file_children())
+            res = await self.pg.fetch(queries.folder_children())
+            res += await self.pg.fetch(queries.file_children())
 
         # In general from_records returns a list[NodeTree]. In this case it will always be a single NodeTree list.
         tree = ExportNodeTree.from_records(res)[0]
 
         return tree.dict(by_alias=True)
 
-    async def delete_node(self):
+    async def _delete_node(self):
         query_class, file_id, folder_id = {
             NodeType.FILE: (FileQuery, self.node_id, []),
             NodeType.FOLDER: (FolderQuery, [], self.node_id)
-        }[await self.get_node_type()]
+        }[await self._get_node_type(self.conn)]
 
         await self.insert_import()
 
@@ -62,9 +62,12 @@ class NodeModel(BaseModel):
         # await self.conn.execute(query_class.subtract_parents_size(self.node_id))
         await self.conn.execute(query_class.delete(self.node_id))
 
+    async def execute_del_node(self):
+        await self.execute_in_transaction(self._delete_node)
+
     async def get_node_history(self, date_start: datetime, date_end: datetime) -> list[dict[str, Any]]:
         # todo: dry!
-        node_type = await self.get_node_type()
+        node_type = await self._get_node_type(self.pg)
         query_class = {
             NodeType.FILE: FileQuery,
             NodeType.FOLDER: FolderQuery
@@ -72,7 +75,7 @@ class NodeModel(BaseModel):
 
         query = query_class.select_nodes_union_history_in_daterange(date_start, date_end, self.node_id, closed=False)
 
-        res = await self.conn.fetch(query)
+        res = await self.pg.fetch(query)
         nodes = [ExportNode(type=node_type, **rec).dict(by_alias=True) for rec in res]
 
         return nodes
@@ -107,7 +110,7 @@ if __name__ == '__main__':
 
         async with pg.transaction() as conn:
             mdl = NodeModel('069cb8d7-bbdd-47d3-ad8f-82ef4c269df1', conn)
-            await mdl.delete_node()
+            await mdl._delete_node()
 
     async def node_history():
         pg = PG()
