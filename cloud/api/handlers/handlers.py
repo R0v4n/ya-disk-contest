@@ -1,28 +1,31 @@
 from datetime import datetime
+from typing import Optional, Union
 
 from aiohttp.web_response import Response, json_response
+from aiohttp_pydantic.oas.typing import r200, r404
 
-from .base import BaseView
+from .base import BasePydanticView
 from .payloads import dumps
-from ..model import ImportData, ImportModel, NodeModel
+from ..model import ImportData, ImportModel, NodeModel, ExportNodeTree, Error
 from ..model.history_model import HistoryModel
 
 
-class ImportsView(BaseView):
+class ImportsView(BasePydanticView):
     URL_PATH = '/imports'
+    ModelT = ImportModel
 
     async def post(self, data: ImportData):
         async with self.pg.transaction() as conn:
-            mdl = ImportModel(data, conn)
+            mdl = self.ModelT(data, conn)
             await mdl.init()
             await mdl.just_do_it()
         return Response()
 
 
-class NodeView(BaseView):
+class NodeView(BasePydanticView):
     URL_PATH = r'/nodes/{node_id}'
 
-    async def get(self, node_id: str, /):
+    async def get(self, node_id: str, /) -> Union[r200[ExportNodeTree], r404[Error]]:
         async with self.pg.transaction() as conn:
             mdl = NodeModel(node_id, conn)
             node = await mdl.get_node()
@@ -30,7 +33,7 @@ class NodeView(BaseView):
         return json_response(node, dumps=dumps)
 
 
-class DeleteNodeView(BaseView):
+class DeleteNodeView(BasePydanticView):
     URL_PATH = r'/delete/{node_id}'
 
     # todo: date validation?
@@ -43,7 +46,7 @@ class DeleteNodeView(BaseView):
         return Response()
 
 
-class UpdatesView(BaseView):
+class UpdatesView(BasePydanticView):
     URL_PATH = r'/updates'
 
     async def get(self, date: datetime):
@@ -53,7 +56,7 @@ class UpdatesView(BaseView):
         return json_response({'items': nodes}, dumps=dumps)
 
 
-class NodeHistoryView(BaseView):
+class NodeHistoryView(BasePydanticView):
     URL_PATH = r'/node/{node_id}/history'
 
     # noinspection PyPep8Naming

@@ -1,12 +1,17 @@
 from datetime import datetime
 
+from aiohttp.web_exceptions import HTTPBadRequest
 from asyncpgsa.connection import SAConnection
 
 from .query_builder import ImportQuery
 
 
 class BaseModel:
-    def __init__(self, conn: SAConnection, date: datetime):
+    def __init__(self, conn: SAConnection, date: datetime | None):
+        # todo: date is None in some cases. need check and refactor probably
+        if date is not None and date.tzinfo is None:
+            raise HTTPBadRequest
+
         self._conn = conn
         self._date = date
 
@@ -17,7 +22,7 @@ class BaseModel:
         return self._conn
 
     @property
-    def date(self):
+    def date(self) -> datetime:
         return self._date
 
     @property

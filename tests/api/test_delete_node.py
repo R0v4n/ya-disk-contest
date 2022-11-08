@@ -1,9 +1,14 @@
+import json
+from datetime import datetime, timezone
+from http import HTTPStatus
+
+import pytest
 from devtools import debug
 
-from cloud.utils.testing import post_import, FakeCloud, del_node, compare_db_fc_state
+from cloud.utils.testing import post_import, FakeCloud, del_node, compare_db_fc_state, File
 
 
-async def test_delete_node_generated(api_client, sync_connection):
+async def test_with_fake_cloud(api_client, sync_connection):
     fake_cloud = FakeCloud()
 
     # ################################################################### #
@@ -50,8 +55,6 @@ async def test_delete_node_generated(api_client, sync_connection):
     await del_node(api_client, f3.id, del_date)
 
     compare_db_fc_state(sync_connection, fake_cloud)
-    debug(fake_cloud.get_tree())
-
     # ################################################################### #
     # update f4
     fake_cloud.generate_import()
@@ -59,19 +62,16 @@ async def test_delete_node_generated(api_client, sync_connection):
     await post_import(api_client, fake_cloud.get_import_dict())
 
     compare_db_fc_state(sync_connection, fake_cloud)
-    debug(fake_cloud.get_tree())
-
     # ################################################################### #
     # del f4
     del_date = fake_cloud.del_item(f4.id)
     await del_node(api_client, f4.id, del_date)
 
     compare_db_fc_state(sync_connection, fake_cloud)
-    debug(fake_cloud.get_tree())
     # ################################################################### #
 
 
-async def test_delete(api_client, sync_connection):
+async def test_delete_old_parent(api_client, sync_connection):
     """Change file parent folder, then del this folder. File should stay in history."""
     fake_cloud = FakeCloud()
     fake_cloud.generate_import([1])
@@ -89,3 +89,18 @@ async def test_delete(api_client, sync_connection):
 
     compare_db_fc_state(sync_connection, fake_cloud)
 
+
+fake_cloud = FakeCloud()
+fake_cloud.generate_import([1])
+
+CASES = [
+    # non existing node id
+    (File().id, datetime.now(timezone.utc), HTTPStatus.NOT_FOUND),
+    # invalid date format (no tz)
+    (fake_cloud.get_node_copy('d1').id, '2022-02-01 12:00:00', HTTPStatus.BAD_REQUEST)
+]
+
+
+@pytest.mark.parametrize(('node_id', 'date', 'expected_status'), CASES)
+async def test_cases(api_client, sync_connection, node_id, date, expected_status):
+    await del_node(api_client, node_id, date, expected_status)

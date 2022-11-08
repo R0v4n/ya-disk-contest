@@ -125,8 +125,8 @@ class QueryBase(ABC):
         return cls.history_table.insert().from_select(cls.history_table.columns, select_q)
 
     @classmethod
-    def exist(cls, node_id: str):
-        return select([exists().where(cls.table.c.id == node_id)])
+    def exist(cls, ids: str | Iterable[str]):
+        return select([exists().where(cls._ids_condition(cls.table, ids))])
 
     @classmethod
     def delete(cls, node_id: str):

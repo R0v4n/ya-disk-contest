@@ -2,10 +2,11 @@ from datetime import datetime
 from enum import Enum
 from http import HTTPStatus
 
+from aiohttp import ClientResponse
 from aiohttp.test_utils import TestClient
 from aiohttp.web_urldispatcher import DynamicResource
 
-from cloud.api.view import ImportsView, NodeView, UpdatesView, NodeHistoryView, DeleteNodeView
+from cloud.api.handlers import ImportsView, NodeView, UpdatesView, NodeHistoryView, DeleteNodeView
 
 
 def url_for(path: str, path_params: dict = None, query_params: dict = None) -> str:
@@ -32,14 +33,37 @@ def url_for(path: str, path_params: dict = None, query_params: dict = None) -> s
     return str(url)
 
 
+def expected_error_response(http_status_code: int):
+    msg_dict = {
+        HTTPStatus.NOT_FOUND: 'Item not found',
+        HTTPStatus.BAD_REQUEST: 'Validation failed'
+    }
+    return {
+        'code': http_status_code,
+        'message': msg_dict[http_status_code]
+    }
+
+
+async def check_response(response: ClientResponse, expected_status: int):
+    pass
+    # assert response.status == expected_status
+    #
+    # if expected_status != HTTPStatus.OK:
+    #     error = await response.json()
+    #     assert error == expected_error_response(expected_status)
+
+
 async def post_import(
         client: TestClient,
         data: dict,
         expected_status: int | Enum = HTTPStatus.OK,
+        url: str = ImportsView.URL_PATH,
         **request_kwargs):
 
-    response = await client.post(ImportsView.URL_PATH, json=data, **request_kwargs)
-    assert response.status == expected_status
+    response = await client.post(url, json=data, **request_kwargs)
+
+    await check_response(response, expected_status)
+    return response
 
 
 async def get_node(
@@ -47,12 +71,12 @@ async def get_node(
         node_id: str,
         expected_status: int | Enum = HTTPStatus.OK,
         **request_kwargs) -> list[dict]:
-
     response = await client.get(
         url_for(NodeView.URL_PATH, dict(node_id=node_id)),
         **request_kwargs
     )
-    assert response.status == expected_status
+
+    await check_response(response, expected_status)
 
     if response.status == HTTPStatus.OK:
         data = await response.json()
@@ -65,7 +89,6 @@ async def del_node(
         date: datetime | str,
         expected_status: int | Enum = HTTPStatus.OK,
         **request_kwargs):
-
     response = await client.delete(
         url_for(
             DeleteNodeView.URL_PATH,
@@ -74,7 +97,7 @@ async def del_node(
         ),
         **request_kwargs
     )
-    assert response.status == expected_status
+    await check_response(response, expected_status)
 
 
 async def get_updates(
@@ -82,7 +105,6 @@ async def get_updates(
         date: datetime | str,
         expected_status: int | Enum = HTTPStatus.OK,
         **request_kwargs):
-
     response = await client.get(
         url_for(
             UpdatesView.URL_PATH,
@@ -90,7 +112,8 @@ async def get_updates(
         ),
         **request_kwargs
     )
-    assert response.status == expected_status
+
+    await check_response(response, expected_status)
 
     if response.status == HTTPStatus.OK:
         data = await response.json()
@@ -104,7 +127,6 @@ async def get_node_history(
         date_end: datetime | str,
         expected_status: int | Enum = HTTPStatus.OK,
         **request_kwargs):
-
     response = await client.get(
         url_for(
             NodeHistoryView.URL_PATH,
@@ -113,7 +135,8 @@ async def get_node_history(
         ),
         **request_kwargs
     )
-    assert response.status == expected_status
+
+    await check_response(response, expected_status)
 
     if response.status == HTTPStatus.OK:
         data = await response.json()
