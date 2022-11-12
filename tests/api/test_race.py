@@ -1,22 +1,19 @@
-from bisect import insort_right
-from collections import deque
-from datetime import timedelta, datetime, timezone
-from http import HTTPStatus
 import asyncio
-from random import randint, sample
+from bisect import insort_right
+from datetime import datetime, timedelta
+from itertools import islice
+from random import sample, choice
 from time import monotonic
 
 import pytest
 from asyncpgsa import PG
-from asyncpgsa.connection import SAConnection
-from deepdiff import DeepDiff
 from devtools import debug
 
 from cloud.api.app import create_app
-from cloud.api.handlers import ImportsView
-from cloud.api.model import ImportModel, ImportData, NodeType
-from cloud.utils.testing import post_import, get_node_records, FakeCloud, compare_db_fc_state, Folder, get_node, File, \
-    FakeCloudGen
+from cloud.api.handlers import ImportsView, DeleteNodeView
+from cloud.api.model import ImportModel, ImportData, NodeModel
+from cloud.utils.testing import (post_import, del_node,
+                                 compare_db_fc_state, get_node, File, FakeCloudGen)
 
 
 class QueueImportModel(ImportModel):
@@ -29,18 +26,6 @@ class QueueImportModel(ImportModel):
     async def acquire_lock(self):
         await self.conn.execute('SELECT pg_advisory_xact_lock($1)', 0)
 
-    # async def execute_post_import(self):
-    #     for _ in range(10000):
-    #         if self.queue[0] == self.date:
-    #             await super().execute_post_import()
-    #             self.queue.pop(0)
-    #             break
-    #
-    #         await asyncio.sleep(0.01)
-    #
-    #     else:
-    #         raise ConnectionError
-
     async def execute_post_import(self):
         await super().execute_post_import()
         self.queue.pop(0)
@@ -52,8 +37,37 @@ class QueueImportModel(ImportModel):
     async def init(self):
         for _ in range(1000000):
             if self.queue[0] == self.date:
-                await self.acquire_lock()
+                # await self.acquire_lock()
                 await super().init()
+                break
+
+            await asyncio.sleep(0.01)
+
+        else:
+            raise ConnectionError
+
+
+class QueueImportModel2(ImportModel):
+
+    async def init(self):
+        for _ in range(1000000):
+            if self.queue[0] == self.date:
+                # await self.acquire_lock()
+                await super().init()
+                break
+
+            await asyncio.sleep(0.01)
+
+        else:
+            raise ConnectionError
+
+
+class QueueNodeModel(NodeModel):
+    async def _delete_node(self):
+        for _ in range(1000000):
+            if self.queue[0] == self.date:
+                # await self.acquire_lock()
+                await super()._delete_node()
                 break
 
             await asyncio.sleep(0.01)
@@ -71,13 +85,18 @@ class LockImportModel(ImportModel):
         await super().execute_post_import()
 
     async def init(self):
-        await self.acquire_lock()
+        # await self.acquire_lock()
         await super().init()
 
 
 class QueueImportsView(ImportsView):
     URL_PATH = r'/with_lock/imports'
-    ModelT = QueueImportModel
+    ModelT = QueueImportModel2
+
+
+class QueueDeleteNodeView(DeleteNodeView):
+    URL_PATH = r'/with_lock/delete/{node_id}'
+    ModelT = QueueNodeModel
 
 
 # fixme: this is a stub for the future
@@ -93,6 +112,7 @@ async def api_client(aiohttp_client, arguments, migrated_postgres):
     """
     app = create_app(arguments)
     app.router.add_route('*', QueueImportsView.URL_PATH, QueueImportsView)
+    app.router.add_route('*', QueueDeleteNodeView.URL_PATH, QueueDeleteNodeView)
 
     client = await aiohttp_client(app, server_kwargs={
         'port': arguments.api_port
@@ -161,7 +181,7 @@ async def test_get_node(api_client, sync_connection):
     cloud = FakeCloudGen()
     cloud.generate_import([[[[[[[[[[[]]]]]]]]]]])
 
-    for _ in range(3):
+    for _ in range(20):
         cloud.random_import(schemas_count=200, allow_random_count=False, max_files_in_one_folder=1)
         cloud.random_updates(count=100, allow_random_count=False)
 
@@ -190,3 +210,96 @@ async def test_get_node(api_client, sync_connection):
     debug(await gather_requests(node_corus))
 
     compare_db_fc_state(sync_connection, cloud)
+
+
+def batched(iterable, n):
+    """Batch data into lists of length n. The last batch may be shorter."""
+    it = iter(iterable)
+    while batch := list(islice(it, n)):
+        yield batch
+
+
+async def test_post_and_delete(api_client, sync_connection):
+    cloud = FakeCloudGen()
+    each_import_ids = []
+
+    def make_imports(count=10):
+        cloud.generate_import([[[[[[[[[[[]]]]]]]]]]])
+        each_import_ids.append(cloud.ids)
+
+        for _ in range((count - 1) // 2):
+            cloud.random_import(schemas_count=10, allow_random_count=False, max_files_in_one_folder=2)
+            cloud.random_updates(count=5, allow_random_count=False)
+            each_import_ids.append(cloud.ids)
+
+            cloud.random_del()
+            each_import_ids.append(cloud.ids)
+
+        if count % 2 == 0:
+            cloud.random_import(schemas_count=10, allow_random_count=False, max_files_in_one_folder=2)
+            each_import_ids.append(cloud.ids)
+
+        return cloud.imports_gen()
+
+    async def gather_requests(reqs_corus):
+        # t0 = monotonic()
+        res = await asyncio.gather(*reqs_corus, return_exceptions=True)
+        # res = [await c for c in reqs_corus]
+        # dt = monotonic() - t0
+        # debug(dt)
+        # debug(res)
+        return res
+
+    def post_and_del_corus(imports):
+        return [
+            post_import(api_client, data, url=QueueImportsView.URL_PATH)
+            if 'items' in data else
+            del_node(api_client, data['deleted_id'], data['updateDate'], url=QueueDeleteNodeView.URL_PATH)
+
+            for data in imports
+        ]
+
+    def node_corus(ids, k=10):
+        if k > len(ids):
+            k = len(ids)
+
+        return [get_node(api_client, i) for i in sample(ids, k)]
+
+    ids = []
+    batch_len = 3
+
+    t0 = monotonic()
+    imports = make_imports(100)
+    t1 = monotonic()
+    debug(t1 - t0)
+    for i, batch in enumerate(batched(imports, batch_len)):
+        if i != 0:
+            ids = each_import_ids[i * batch_len - 1]
+        await gather_requests(post_and_del_corus(batch) + node_corus(ids, batch_len * 6))
+
+    dt = monotonic() - t1
+    debug(dt)
+
+    compare_db_fc_state(sync_connection, cloud)
+
+
+def test_dict():
+    n = 10000
+    d = dict(zip(range(n), range(n)))
+    s = set(range(n))
+
+    def t(d):
+        t0 = monotonic()
+        for _ in range(10000):
+            tuple(d)
+        t1 = monotonic()
+        debug(t1 - t0)
+
+    t(d.keys())
+    t(s)
+
+
+def test_td():
+    d1 = datetime.now()
+    d2 = d1 + timedelta(hours=1)
+    print((d2-d1)*0.43+d1)

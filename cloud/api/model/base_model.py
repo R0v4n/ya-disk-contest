@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from bisect import insort
 from datetime import datetime
 from typing import Callable, Coroutine
 
@@ -10,10 +11,15 @@ from .query_builder import ImportQuery
 
 
 class BaseImportModel:
+    queue: list[datetime] = []
+
     def __init__(self, pg: PG, date: datetime | None):
         # todo: date is None in some cases. need check and refactor probably
         if date is not None and date.tzinfo is None:
             raise HTTPBadRequest
+
+        if date is not None:
+            insort(self.queue, date)
 
         self.pg = pg
         self._date = date
@@ -28,6 +34,8 @@ class BaseImportModel:
                 await m()
 
         self._conn = None
+        if self.date is not None:
+            self.queue.pop(0)
 
     @property
     def conn(self) -> SAConnection:

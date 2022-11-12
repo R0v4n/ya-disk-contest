@@ -143,10 +143,23 @@ class Import(pdt.BaseModel):
     items: dict[str, Item] = pdt.Field(default_factory=dict)
     date: datetime
     history_ids: set[str] = pdt.Field(default_factory=set)
+    deleted_id: str | None = None
 
     def add_item(self, item: Item):
         item = item.shallow_copy()
         self.items[item.id] = item
+
+    def import_dict(self):
+        if self.deleted_id is None:
+            return {
+                'items': [item.import_dict for item in self.items.values()],
+                'updateDate': str(self.date)
+            }
+        else:
+            return {
+                'deleted_id': self.deleted_id,
+                'updateDate': str(self.date)
+            }
 
 
 # todo: write tests for it!
@@ -159,6 +172,8 @@ class FakeCloud:
         self._items: dict[str | None, Item] = {None: self._root}
         self._imports: list[Import] = []
         self._history: list[Item] = []
+
+        self._folder_ids: set[str | None] = {None}
 
     def generate_import(
             self,
@@ -276,13 +291,17 @@ class FakeCloud:
 
     def del_item(self, id_: str, date: datetime = None):
 
-        self._add_new_import_obj(date)
-
         item = self._get_item(id_)
+
+        self._add_new_import_obj(date)
+        self._imports[-1].deleted_id = item.id
+
         self._update_parents(item.parent_id, -item.size)
         deleted_ids = item.children_ids | {item.id}
         for i in deleted_ids:
             self._items.pop(i)
+
+        self._folder_ids -= deleted_ids
 
         self._pop_from_children(item)
 
@@ -333,11 +352,7 @@ class FakeCloud:
         :param import_id: if None returns last import data. Can be negative value (-1 is last import data)
         :return: import data dict formatted according to API spec.
         """
-        data = self._get_import_data(import_id)
-        return {
-            'items': [item.import_dict for item in data.items.values()],
-            'updateDate': str(data.date)
-        }
+        return self._get_import_obj(import_id).import_dict()
 
     def imports_gen(self):
         return (self.get_import_dict(i.id) for i in self._imports)
@@ -416,7 +431,7 @@ class FakeCloud:
 
     @property
     def ids(self):
-        return tuple(key for key in self._items.keys() if key is not None)
+        return tuple(self._items.keys() - {None})
 
     @property
     def last_import_date(self):
@@ -455,21 +470,25 @@ class FakeCloud:
 
         return self._imports[-1].id
 
-    def _get_import_data(self, import_id: int = None) -> Import:
+    def _get_import_obj(self, import_id: int = None) -> Import:
         if import_id is None:
             import_id = -1
 
         if import_id > len(self._imports) or import_id == 0 or import_id < - len(self._imports):
             raise ValueError(f'Import with id = {import_id} does not exist')
-        else:
-            if import_id > 0:
-                import_id -= 1
-            return self._imports[import_id]
+
+        if import_id > 0:
+            import_id -= 1
+
+        return self._imports[import_id]
 
     def _insert_new_item(self, item: Item):
         self._items[item.id] = item
         self._items[item.parent_id].children.append(item)
         self._imports[-1].add_item(item)
+
+        if type(item) == Folder:
+            self._folder_ids.add(item.id)
 
     def _update_parents(self, parent_id: str, size: int):
         date = self._imports[-1].date
@@ -507,21 +526,25 @@ class FakeCloud:
 class FakeCloudGen(FakeCloud):
     # todo: use faker instance
 
-    @property
-    def _folder_ids(self):
-        """None included!"""
-        return tuple(key for key, val in self._items.items() if type(val) == Folder)
+    def __init__(self, write_history=True):
+
+        super().__init__()
+        self._write_history = write_history
+
+    def _write_item_to_history(self, item: Item):
+        if self._write_history:
+            super()._write_item_to_history(item)
 
     @staticmethod
-    def random_schema(max_files_in_one_folder=5, max_depth=None):
+    def random_schema(max_files_in_one_folder=5, max_depth: int | None = 10):
         def build(depth=1):
             if max_depth is None or depth < max_depth:
-                coin = rnd.choice(range(2))
+                coin = rnd.choice(range(4))
             else:
                 coin = 0
 
             if coin:
-                return [build(depth + 1) for i in range(rnd.randint(0, 2))]
+                return [build(depth + 1) for _ in range(rnd.randint(0, 3))]
             else:
                 return rnd.randint(1, max_files_in_one_folder)
 
@@ -529,8 +552,9 @@ class FakeCloudGen(FakeCloud):
 
         return [res] if isinstance(res, int) else res
 
-    def random_import(self, *, schemas_count=1, allow_random_count=True, max_files_in_one_folder=5):
-        self.generate_import()
+    def random_import(self, *, schemas_count=1, date: datetime | str = None,
+                      allow_random_count=True, max_files_in_one_folder=5):
+        self.generate_import(date=date)
 
         if allow_random_count:
             schemas_count = rnd.randint(0, schemas_count)
@@ -538,7 +562,7 @@ class FakeCloudGen(FakeCloud):
         for _ in range(schemas_count):
             self.generate_import(
                 *self.random_schema(max_files_in_one_folder=max_files_in_one_folder),
-                parent_id=rnd.choice(self._folder_ids),
+                parent_id=rnd.choice(tuple(self._folder_ids)),
                 is_new=False
             )
 
@@ -547,7 +571,7 @@ class FakeCloudGen(FakeCloud):
         id_ = rnd.choice(tuple(ids))
         item = self._items[id_]
 
-        allowed_parents = set(self._folder_ids)
+        allowed_parents = self._folder_ids.copy()
 
         if type(item) == Folder:
             allowed_parents -= item.children_ids | {id_}
@@ -576,71 +600,11 @@ class FakeCloudGen(FakeCloud):
     def random_del(self):
         ids = self.ids
         if ids:
-            i: str = rnd.choice(self.ids)
+            i = rnd.choice(self.ids)
             return i, self.del_item(i)
         else:
             return None, None
 
 
 if __name__ == '__main__':
-    def some_generation():
-        fc = FakeCloud()
-        fc.generate_import([2], [1], 1)
-        # debug(fc.get_tree(nullify_folder_sizes=True))
-        # debug(fc.get_import_dict())
-        # time.sleep(0.1)
-        d2 = fc.get_node_copy('d2')
-        fc.generate_import([2, [1]], parent_id=d2.id)
-        f1 = fc.get_node_copy('d2/d1/f1')
-        d3 = fc.get_node_copy('d2/d1')
-
-        debug(fc.get_tree())
-        debug(fc.get_raw_db_history_records())
-        fc.del_item(d3.id)
-        debug(fc.get_tree())
-        debug(fc.get_raw_db_history_records())
-
-        # debug(fc.get_raw_db_records())
-
-
-    def updated_file_in_new_folder_case():
-        # todo: test this case in app:
-        #  on the second import, existing file is moved to the new folder.
-        #  I assume that this case is impossible in real life.
-        #  user can't create new folder and move existing file to it simultaneously.
-        #  The correct behavior would be to not add the folder to the history, I suppose.
-        cloud = FakeCloud()
-        cloud.generate_import([1])
-        debug(cloud.get_tree())
-
-        folder1 = cloud.get_node_copy('d1')
-        file = cloud.get_node_copy('d1/f1')
-
-        cloud.generate_import([], parent_id=folder1.id)
-
-        folder2 = cloud.get_node_copy('d1/d1')
-        cloud.update_item(file.id, parent_id=folder2.id)
-
-        debug(cloud.get_tree())
-        debug(cloud.get_import_dict())
-        debug(cloud.get_raw_db_history_records())
-
-
-    def some_check():
-        cloud = FakeCloud()
-        cloud.generate_import([2, [2]])
-        i = cloud.get_node_copy('d1/f1').id
-        cloud.generate_import()
-        cloud.update_item(i)
-        cloud.update_item(i)
-        exit()
-        d1 = cloud.get_node_copy('d1/d1')
-        f1 = cloud.get_node_copy('d1/f1')
-
-        cloud.generate_import(1, parent_id=d1.id)
-        cloud.update_item(f1.id, size=100)
-        debug(cloud.get_updates())
-        debug(cloud.get_tree())
-
-
-    some_check()
+    debug(FakeCloudGen.random_schema())

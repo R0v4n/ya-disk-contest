@@ -30,9 +30,10 @@ class NodeView(BasePydanticView):
 
 class DeleteNodeView(BasePydanticView):
     URL_PATH = r'/delete/{node_id}'
+    ModelT = NodeModel
 
     async def delete(self, node_id: str, /, date: datetime):
-        await NodeModel(node_id, self.pg, date).execute_del_node()
+        await self.ModelT(node_id, self.pg, date).execute_del_node()
         return Response()
 
 

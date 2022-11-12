@@ -8,6 +8,8 @@ from cloud.utils.testing import post_import, FakeCloud, compare_db_fc_state, Fol
 from tests.api.datasets import dataset_for_post_import
 
 
+# todo: add test with random folders order in one branch
+
 async def test_with_static_data(api_client, fake_cloud, sync_connection):
     dataset = dataset_for_post_import()
 

@@ -45,12 +45,12 @@ def expected_error_response(http_status_code: int):
 
 
 async def check_response(response: ClientResponse, expected_status: int):
-    pass
-    # assert response.status == expected_status
-    #
-    # if expected_status != HTTPStatus.OK:
-    #     error = await response.json()
-    #     assert error == expected_error_response(expected_status)
+
+    assert response.status == expected_status
+
+    if expected_status != HTTPStatus.OK:
+        error = await response.json()
+        assert error == expected_error_response(expected_status)
 
 
 async def post_import(
@@ -71,6 +71,7 @@ async def get_node(
         node_id: str,
         expected_status: int | Enum = HTTPStatus.OK,
         **request_kwargs) -> list[dict]:
+
     response = await client.get(
         url_for(NodeView.URL_PATH, dict(node_id=node_id)),
         **request_kwargs
@@ -81,6 +82,8 @@ async def get_node(
     if response.status == HTTPStatus.OK:
         data = await response.json()
         return data
+    else:
+        return response
 
 
 async def del_node(
@@ -88,16 +91,18 @@ async def del_node(
         node_id: str,
         date: datetime | str,
         expected_status: int | Enum = HTTPStatus.OK,
+        url: str = DeleteNodeView.URL_PATH,
         **request_kwargs):
     response = await client.delete(
         url_for(
-            DeleteNodeView.URL_PATH,
+            url,
             path_params=dict(node_id=node_id),
             query_params=dict(date=date)
         ),
         **request_kwargs
     )
     await check_response(response, expected_status)
+    return response
 
 
 async def get_updates(
@@ -119,7 +124,7 @@ async def get_updates(
         data = await response.json()
         return data
 
-
+# todo: range validation?
 async def get_node_history(
         client: TestClient,
         node_id: str,

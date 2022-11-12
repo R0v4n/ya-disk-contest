@@ -4,3 +4,4 @@ SQLAlchemy-Utils==0.38.3
 Faker~=15.1.1
 deepdiff==6.2.1
 devtools==0.9.0
+locust==2.13.0
