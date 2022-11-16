@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-import random
-import random as rnd
 from datetime import datetime, timezone, timedelta
+from functools import partial
 from itertools import groupby
-from typing import Any
+from typing import Any, Callable
 from uuid import UUID
 
 import faker
 import pydantic as pdt
-from devtools import debug
 
-from cloud.api.model import NodeType
+from cloud.api.model import ItemType
+
 
 fake = faker.Faker(use_weighting=False)
+rnd = fake.random
 
 
 class Item(pdt.BaseModel):
@@ -59,7 +59,7 @@ class Item(pdt.BaseModel):
     def _cast_tree_types(tree: dict[str, Any], nullify_folder_sizes=False):
         def cast(node_dict: dict[str, Any]):
             node_dict['date'] = str(node_dict['date'])
-            if node_dict['type'] == NodeType.FOLDER.value:
+            if node_dict['type'] == ItemType.FOLDER.value:
                 if nullify_folder_sizes:
                     node_dict['size'] = 0
                 for node in node_dict['children']:
@@ -99,7 +99,7 @@ class Item(pdt.BaseModel):
 
 
 class Folder(Item):
-    type: str = NodeType.FOLDER.value
+    type: str = ItemType.FOLDER.value
     url: None = None
     size: pdt.conint(ge=0) | None = 0
 
@@ -126,7 +126,7 @@ class Folder(Item):
 
 
 class File(Item):
-    type: str = NodeType.FILE.value
+    type: str = ItemType.FILE.value
     url: str = pdt.Field(default_factory=lambda: fake.file_path())
     size: pdt.conint(gt=0) = pdt.Field(default_factory=lambda: fake.random_int(1, 10))
 
@@ -238,7 +238,7 @@ class FakeCloud:
         items = import_data['items']
 
         for item_dict in items:
-            item_type = Folder if item_dict['type'] == NodeType.FOLDER.value else File
+            item_type = Folder if item_dict['type'] == ItemType.FOLDER.value else File
             f = item_type(**item_dict, date=date, import_id=import_id)
 
             if f.size is None:
@@ -333,7 +333,7 @@ class FakeCloud:
 
         items = sorted(
             filter(
-                lambda item: item.type == NodeType.FILE.value and date_start <= item.date <= date_end,
+                lambda item: item.type == ItemType.FILE.value and date_start <= item.date <= date_end,
                 self._history + list(self._items_gen)
             ),
             key=lambda item: item.id
@@ -523,8 +523,29 @@ class FakeCloud:
             self._history.append(item.shallow_copy())
 
 
+def random_schema(max_files_in_one_folder: int = 5, max_depth: int | None = 10,
+                  folder_weight: int = 1, max_branch_count: int = 2) -> list[list | int]:
+    def build(depth=1):
+        if max_depth is None or depth < max_depth:
+            coin = rnd.choice(range(1 + folder_weight))
+        else:
+            coin = 0
+
+        if coin:
+            return [build(depth + 1) for _ in range(rnd.randint(0, max_branch_count))]
+        else:
+            return rnd.randint(1, max_files_in_one_folder)
+
+    res = build()
+
+    return [res] if isinstance(res, int) else res
+
+
+default_schema_gen = partial(random_schema, max_files_in_one_folder=5, max_depth=10,
+                             folder_weight=1, max_branch_count=2)
+
+
 class FakeCloudGen(FakeCloud):
-    # todo: use faker instance
 
     def __init__(self, write_history=True):
 
@@ -535,25 +556,13 @@ class FakeCloudGen(FakeCloud):
         if self._write_history:
             super()._write_item_to_history(item)
 
-    @staticmethod
-    def random_schema(max_files_in_one_folder=5, max_depth: int | None = 10):
-        def build(depth=1):
-            if max_depth is None or depth < max_depth:
-                coin = rnd.choice(range(4))
-            else:
-                coin = 0
+    def random_import(
+            self, *,
+            schemas_count=1,
+            schema_gen_func: Callable[[], list[int | list]] = default_schema_gen,
+            date: datetime | str = None,
+            allow_random_count=True):
 
-            if coin:
-                return [build(depth + 1) for _ in range(rnd.randint(0, 3))]
-            else:
-                return rnd.randint(1, max_files_in_one_folder)
-
-        res = build()
-
-        return [res] if isinstance(res, int) else res
-
-    def random_import(self, *, schemas_count=1, date: datetime | str = None,
-                      allow_random_count=True, max_files_in_one_folder=5):
         self.generate_import(date=date)
 
         if allow_random_count:
@@ -561,7 +570,7 @@ class FakeCloudGen(FakeCloud):
 
         for _ in range(schemas_count):
             self.generate_import(
-                *self.random_schema(max_files_in_one_folder=max_files_in_one_folder),
+                *schema_gen_func(),
                 parent_id=rnd.choice(tuple(self._folder_ids)),
                 is_new=False
             )
@@ -575,10 +584,10 @@ class FakeCloudGen(FakeCloud):
 
         if type(item) == Folder:
             allowed_parents -= item.children_ids | {id_}
-            self.update_item(id_, parent_id=random.choice(tuple(allowed_parents)))
+            self.update_item(id_, parent_id=rnd.choice(tuple(allowed_parents)))
         else:
             updates = [
-                ('parent_id', random.choice(tuple(allowed_parents))),
+                ('parent_id', rnd.choice(tuple(allowed_parents))),
                 ('size', rnd.randint(1, 10)),
                 ('url', fake.file_path())
             ]
@@ -604,7 +613,3 @@ class FakeCloudGen(FakeCloud):
             return i, self.del_item(i)
         else:
             return None, None
-
-
-if __name__ == '__main__':
-    debug(FakeCloudGen.random_schema())

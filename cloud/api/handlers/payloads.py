@@ -1,28 +1,30 @@
 import json
 from datetime import datetime
-from functools import partial
+from functools import partial, singledispatch
 
 from asyncpg import Record
 
-from cloud.api.model import NodeType
+from cloud.api.model import ItemType
 
 
-# todo: refactor singledispathed
-def convert_asyncpg_record(value):
-    """
-    Позволяет автоматически сериализовать результаты запроса, возвращаемые
-    asyncpg.
-    """
-    if type(value) == Record:
-        return dict(value)
-
-    if type(value) == datetime:
-        return str(value)
-
-    if type(value) == NodeType:
-        return value.value
-
+@singledispatch
+def convert(value):
     raise TypeError(f'Unserializable value: {value} of type: {type(value)}')
 
 
-dumps = partial(json.dumps, default=convert_asyncpg_record, ensure_ascii=False)
+@convert.register
+def convert_asyncpg_record(value: Record):
+    return dict(value)
+
+
+@convert.register
+def convert_datetime(value: datetime):
+    return str(value)
+
+
+@convert.register
+def convert_node_type_enum(value: ItemType):
+    return value.value
+
+
+dumps = partial(json.dumps, default=convert, ensure_ascii=False)

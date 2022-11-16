@@ -1,9 +1,6 @@
-from http import HTTPStatus
-
 from aiohttp.web_exceptions import HTTPBadRequest
-from aiohttp.web_response import json_response
-from asyncpgsa import PG
 from aiohttp_pydantic import PydanticView
+from asyncpgsa import PG
 from pydantic import ValidationError
 
 

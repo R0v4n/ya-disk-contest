@@ -5,10 +5,9 @@ from collections import defaultdict
 # todo: install python 3.11 and use Self
 from typing import Iterable, Mapping, Any, TypeVar  # , Self
 
-# todo: fix imports path everywhere
-from cloud.api.model.data_classes import ImportNode, NodeType, ExportNode, Node
+from .data_classes import ImportItem, ItemType, ExportItem, Item
 
-TNodeModel = TypeVar('TNodeModel', bound=Node)
+TNodeModel = TypeVar('TNodeModel', bound=Item)
 
 # todo: think about Tree interface
 
@@ -31,7 +30,7 @@ class TreeMixin(ABC):
         return cls.from_nodes(nodes)
 
     @classmethod
-    def from_nodes(cls, nodes: Iterable[Node | 'Self']) -> list['Self']:
+    def from_nodes(cls, nodes: Iterable[Item | 'Self']) -> list['Self']:
 
         id_children_map: dict[str | None, list['Self']] = defaultdict(list)
 
@@ -43,7 +42,7 @@ class TreeMixin(ABC):
 
             ids |= {node.id}
 
-            if node.type == NodeType.FOLDER:
+            if node.type == ItemType.FOLDER:
                 node.children = id_children_map[node.id]
 
             id_children_map[node.parent_id].append(node)
@@ -53,11 +52,11 @@ class TreeMixin(ABC):
         return top_nodes
 
 
-class ExportNodeTree(ExportNode, TreeMixin):
+class ExportNodeTree(ExportItem, TreeMixin):
     children: list[ExportNodeTree] | None = None
 
 
-class ImportNodeTree(ImportNode, TreeMixin):
+class ImportNodeTree(ImportItem, TreeMixin):
     children: list[ImportNodeTree] | None = None
 
     def flatten_nodes_dict_gen(self, import_id: int):

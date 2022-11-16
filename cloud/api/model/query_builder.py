@@ -1,17 +1,17 @@
 from abc import ABC
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Iterable, Any
 
 from sqlalchemy import Table, select, func, exists, literal_column, String
 
-from cloud.api.model.data_classes import NodeType
+from .data_classes import ItemType
 from cloud.db.schema import files_table, folder_history, folders_table, file_history, imports_table
 
 
 class QueryBase(ABC):
     table: Table
     history_table: Table
-    node_type: NodeType
+    node_type: ItemType
 
     @staticmethod
     def _build_columns(table: Table, columns: list[str | None] | None = None):
@@ -196,40 +196,10 @@ class QueryBase(ABC):
 class FolderQuery(QueryBase):
     table = folders_table
     history_table = folder_history
-    node_type = NodeType.FOLDER
+    node_type = ItemType.FOLDER
 
     def __init__(self):
         raise NotImplementedError('This class is a functor. No need to create instance.')
-
-    # @classmethod
-    # def recursive_children2(cls, folder_id: str):
-    #     folder_cols: list[str | None] = ['id', 'parent_id', 'size']
-    #     top_folder = cls.select_node_with_date(
-    #         folder_id,
-    #         folder_cols + [text('url')]
-    #     ).cte(recursive=True)
-    #     # print(top_folder)
-    #     # exit()
-    #     top_folder_alias = top_folder.alias()
-    #     files_alias = files.alias()
-    #     folders_alias = cls.table.alias()
-    #
-    #     s1 = cls.select_join_date(folders_alias, columns=folder_cols + [None])
-    #     print(s1)
-    #     s2 = cls.select_join_date(files_alias, columns=folder_cols + ['url'])
-    #     print(s2)
-    #     print()
-    #     s3 = s1.union_all(s2).alias()
-    #     print(select(s3.columns))
-    #     print()
-    #     children = top_folder.union_all(
-    #         select(s3.columns).
-    #         select_from(s3.join(
-    #             top_folder_alias,
-    #             s3.c.parent_id == top_folder_alias.c.id
-    #         ))
-    #     )
-    #     return children.select()
 
     @classmethod
     def recursive_children(cls, folder_id: str):
@@ -257,7 +227,7 @@ class FolderQuery(QueryBase):
 class FileQuery(QueryBase):
     table = files_table
     history_table = file_history
-    node_type = NodeType.FILE
+    node_type = ItemType.FILE
 
     def __init__(self):
         raise NotImplementedError('This class is a functor. No need to create instance.')
@@ -360,23 +330,10 @@ class NodeQuery:
         folders_select = FolderQuery.recursive_children(self.node_id).alias()
 
         cols = ['id', 'parent_id', 'size', 'url']
-        cols += [literal_column(f"'{NodeType.FILE.value}'", String).label('type')]
+        cols += [literal_column(f"'{ItemType.FILE.value}'", String).label('type')]
 
         files_with_date = FileQuery.select_join_date(files_table, columns=cols).alias()
         query = select(files_with_date.columns). \
             select_from(files_with_date.join(folders_select))
 
         return query
-
-
-if __name__ == '__main__':
-    # print(FileQuery.select_node_with_date('1', ['id', 'parent_id', 'url', 'size']))
-    # print(FolderQuery.recursive_children('1'))
-    # print(NodeQuery('1').file_children())
-    print(ImportQuery(['1', '11'], ['2', '3'], 1).update_folder_sizes(False))
-    exit()
-    # print(FolderQuery.subtract_parents_size('1'))
-    ds = datetime.fromisoformat('2022-02-01 12:00:00 +00:00')
-    de = datetime.fromisoformat('2022-02-02 12:00:00 +00:00')
-    # print(de - timedelta(1))
-    print(FileQuery.select_updates_daterange(ds, de))

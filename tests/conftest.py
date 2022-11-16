@@ -6,11 +6,11 @@ import pytest
 from sqlalchemy_utils import create_database, drop_database
 from yarl import URL
 
-from cloud.utils.pg import DEFAULT_PG_URL, make_alembic_config
+from cloud.utils.pg import DEFAULT_PG_DSN, make_alembic_config
 from cloud.utils.testing import FakeCloud
 
 # fixme: CI?
-PG_URL = os.getenv('CLOUD_PG_URL', DEFAULT_PG_URL)
+PG_URL = os.getenv('CLOUD_PG_URL', DEFAULT_PG_DSN)
 
 
 @pytest.fixture

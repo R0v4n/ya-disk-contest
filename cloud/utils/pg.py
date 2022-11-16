@@ -6,7 +6,7 @@ from alembic.config import Config
 from asyncpgsa import PG
 from configargparse import Namespace
 
-DEFAULT_PG_URL = 'postgresql://rovan:hackme@localhost:5432/cloud'
+DEFAULT_PG_DSN = 'postgresql://rovan:hackme@localhost:5432/cloud'
 
 CLOUD_PATH = Path(__file__).parent.parent.resolve()
 

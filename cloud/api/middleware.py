@@ -6,8 +6,8 @@ from aiohttp.web_middlewares import middleware
 from aiohttp.web_request import Request
 from aiohttp.web_response import json_response
 
-from cloud.api.handlers.payloads import dumps
-from cloud.api.model import ParentIdValidationError
+from .handlers.payloads import dumps
+from .model import ParentIdValidationError
 
 
 # todo: add logging

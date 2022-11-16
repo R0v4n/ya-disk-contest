@@ -1,17 +1,41 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=65.5"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "cloud"
-dynamic = ["version", "dependencies", "optional-dependencies"]
+version = "0.1.0"
+authors = [
+  { name="Andrey Khabirov", email="mr.rovan@yandex.ru" }
+]
+description = "A service with a REST API that implements a backend for a file storage web service, similar to the Yandex Disk service"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file='LICENSE'}
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Development Status :: 3 - Alpha",
+    "Natural Language :: Russian",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: Implementation :: CPython"
+]
+
+dynamic = ["dependencies", "optional-dependencies"]
+
 
 [project.scripts]
 cloud-api = "cloud.api.__main__:main"
 cloud-db = "cloud.db.__main__:main"
 
-# todo: add dev reqs and other stuff
+
 [tool.setuptools.dynamic]
-version = {attr = "cloud.__version__"}
 dependencies = {file = ["requirements.txt"]}
 optional-dependencies = {dev = { file = ["requirements.dev.txt"] }}
+
+
+[project.urls]
+"Homepage" = "https://github.com/R0v4n/enrollment_autumn_2022"

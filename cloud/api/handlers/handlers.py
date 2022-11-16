@@ -1,20 +1,48 @@
 from datetime import datetime
-from typing import Optional, Union
 
 from aiohttp.web_response import Response, json_response
-from aiohttp_pydantic.oas.typing import r200, r404
+from aiohttp_pydantic.oas.typing import r200, r404, r400
 
 from .base import BasePydanticView
 from .payloads import dumps
-from ..model import ImportData, ImportModel, NodeModel, ExportNodeTree, Error
-from ..model.history_model import HistoryModel
+from ..model import ImportData, ImportModel, NodeModel, ExportNodeTree, HistoryModel, Error
+from ..model.data_classes import ExportItem
 
+
+# todo: Is there a way to write a more precise specs with aiohttp-pydantic?
 
 class ImportsView(BasePydanticView):
     URL_PATH = '/imports'
     ModelT = ImportModel
 
-    async def post(self, data: ImportData):
+    async def post(self, data: ImportData) -> r200 | r400[Error]:
+        """
+        Импортирует элементы файловой системы. Элементы импортированные повторно обновляют текущие.
+        Изменение типа элемента с папки на файл и с файла на папку не допускается.
+        Порядок элементов в запросе является произвольным.
+
+          - id каждого элемента является уникальным среди остальных элементов
+          - поле id не может быть равно null
+          - родителем элемента может быть только папка
+          - принадлежность к папке определяется полем parentId
+          - элементы могут не иметь родителя (при обновлении parentId на null элемент остается без родителя)
+          - поле url при импорте папки всегда должно быть равно null
+          - размер поля url при импорте файла всегда должен быть меньше либо равным 255
+          - поле size при импорте папки всегда должно быть равно null
+          - поле size для файлов всегда должно быть больше 0
+          - при обновлении элемента обновленными считаются **все** их параметры
+          - при обновлении параметров элемента обязательно обновляется поле **date** в соответствии с временем обновления
+          - в одном запросе не может быть двух элементов с одинаковым id
+          - дата обрабатывается согласно ISO 8601 (такой придерживается OpenAPI).
+          Если дата не удовлетворяет данному формату, ответом будет код 400.
+
+        Гарантируется, что во входных данных нет циклических зависимостей и поле updateDate монотонно возрастает.
+        Гарантируется, что при проверке передаваемое время кратно секундам.
+
+        Status codes:
+            200: Вставка или обновление прошли успешно.
+            400: Невалидная схема документа или входные данные не верны.
+        """
         mdl = self.ModelT(data, self.pg)
         await mdl.execute_post_import()
         return Response()
@@ -23,7 +51,16 @@ class ImportsView(BasePydanticView):
 class NodeView(BasePydanticView):
     URL_PATH = r'/nodes/{node_id}'
 
-    async def get(self, node_id: str, /) -> Union[r200[ExportNodeTree], r404[Error]]:
+    async def get(self, node_id: str, /) -> r200[ExportNodeTree] | r404[Error] | r400[Error]:
+        """
+        Получить информацию об элементе по идентификатору.
+        При получении информации о папке также предоставляется информация о её дочерних элементах.
+
+        Status codes:
+            200: Информация об элементе.
+            400: Невалидная схема документа или входные данные не верны.
+            404: Элемент не найден.
+        """
         node = await NodeModel(node_id, self.pg).get_node()
         return json_response(node, dumps=dumps)
 
@@ -32,7 +69,20 @@ class DeleteNodeView(BasePydanticView):
     URL_PATH = r'/delete/{node_id}'
     ModelT = NodeModel
 
-    async def delete(self, node_id: str, /, date: datetime):
+    async def delete(
+            self,
+            node_id: str, /,
+            date: datetime
+    ) -> r200 | r404[Error] | r400[Error]:
+        """
+        Удалить элемент по идентификатору. При удалении папки удаляются все дочерние элементы.
+        Доступ к истории обновлений удаленного элемента невозможен.
+
+        Status codes:
+            200: Удаление прошло успешно.
+            400: Невалидная схема документа или входные данные не верны.
+            404: Элемент не найден.
+        """
         await self.ModelT(node_id, self.pg, date).execute_del_node()
         return Response()
 
@@ -40,7 +90,15 @@ class DeleteNodeView(BasePydanticView):
 class UpdatesView(BasePydanticView):
     URL_PATH = r'/updates'
 
-    async def get(self, date: datetime):
+    async def get(self, date: datetime) -> r200[ExportItem] | r400[Error]:
+        """
+        Получение списка файлов, которые были обновлены за последние 24 часа включительно [date - 24h, date]
+        от времени переданном в запросе.
+
+        Status codes:
+            200: Список элементов, которые были обновлены.
+            400: Невалидная схема документа или входные данные не верны
+        """
         mdl = HistoryModel(self.pg, date)
         nodes = await mdl.get_files_updates_24h()
 
@@ -51,8 +109,21 @@ class NodeHistoryView(BasePydanticView):
     URL_PATH = r'/node/{node_id}/history'
 
     # noinspection PyPep8Naming
-    async def get(self, node_id: str, /, dateStart: datetime, dateEnd: datetime):
+    async def get(
+            self,
+            node_id: str, /,
+            dateStart: datetime,
+            dateEnd: datetime
+    ) -> r200[ExportItem] | r400[Error] | r404[Error]:
+        """
+        Получение истории обновлений по элементу за заданный полуинтервал [from, to).
+        История по удаленным элементам недоступна.
 
+        Status codes:
+            200: История по элементу.
+            400: Невалидная схема документа или входные данные не верны.
+            404: Элемент не найден.
+        """
         mdl = NodeModel(node_id, self.pg)
         nodes = await mdl.get_node_history(dateStart, dateEnd)
 
