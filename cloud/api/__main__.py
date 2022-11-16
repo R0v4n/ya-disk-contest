@@ -2,22 +2,19 @@ import argparse
 
 from aiohttp import web
 from configargparse import ArgumentParser
-# noinspection PyPackageRequirements
 from yarl import URL
 
-from cloud.api.app import create_app
+from .app import create_app
 from cloud.utils.arguments_parse import positive_int, clear_environ
-from cloud.utils.pg import DEFAULT_PG_URL
+from cloud.utils.pg import DEFAULT_PG_DSN
 
 # todo:
-#  -write configs
 #  -validation
 #  -add logging
-#  -drop enum type in alembic config
 #  -think about to change ids from string to int or uuid. does is matter?
-#  -remove sec fractions from db
-#  -00:00 to Z in GET/nodes/id response json
-
+#  -need to handle concurrent imports order somehow. queue is doing the job, but it is bad solution.
+#   probably refactor to v 0.1.1 with more realistic imports and blocking only one folder branch in db.
+#   Also in this case refactor history for folder
 
 ENV_VAR_PREFIX = 'CLOUD_'
 
@@ -37,7 +34,7 @@ group.add_argument('--api-port', type=positive_int, default=8081,
                    help='TCP port API server would listen on')
 
 group = parser.add_argument_group('PostgreSQL options')
-group.add_argument('--pg-url', type=URL, default=URL(DEFAULT_PG_URL),
+group.add_argument('--pg-url', type=URL, default=URL(DEFAULT_PG_DSN),
                    help='URL to use to connect to the database')
 group.add_argument('--pg-pool-min-size', type=int, default=20,
                    help='Minimum database connections')
@@ -53,7 +50,8 @@ group.add_argument('--pg-pool-max-size', type=int, default=20,
 
 def main():
     args = parser.parse_args()
-
+    print(args.api_address)
+    print(Settings().dict())
     clear_environ(lambda name: name.startswith(ENV_VAR_PREFIX))
     # todo: add logging and socket. how to change user on Windows?
     app = create_app(args)

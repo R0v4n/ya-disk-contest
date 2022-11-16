@@ -124,7 +124,7 @@ async def get_updates(
         data = await response.json()
         return data
 
-# todo: range validation?
+
 async def get_node_history(
         client: TestClient,
         node_id: str,

@@ -1,7 +1,5 @@
-from abc import abstractmethod
 from bisect import insort
 from datetime import datetime
-from typing import Callable, Coroutine
 
 from aiohttp.web_exceptions import HTTPBadRequest
 from asyncpgsa import PG

@@ -10,11 +10,11 @@ from asyncpgsa import PG
 from asyncpgsa.connection import SAConnection
 from sqlalchemy import Table
 
-from cloud.api.model.data_classes import ImportData, NodeType, ImportNode, ParentIdValidationError
-from cloud.api.model.node_tree import ImportNodeTree
-from cloud.api.model.query_builder import FileQuery, FolderQuery, QueryBase, ImportQuery
-from cloud.db.schema import folders_table, files_table
+from .data_classes import ImportData, ItemType, ImportItem, ParentIdValidationError
+from .node_tree import ImportNodeTree
+from .query_builder import FileQuery, FolderQuery, QueryBase, ImportQuery
 from .base_model import BaseImportModel
+from cloud.db.schema import folders_table, files_table
 
 
 class ImportModel(BaseImportModel):
@@ -97,7 +97,7 @@ class ImportModel(BaseImportModel):
 
 class NodeListBaseModel(ABC):
     # todo: add hasattr check. rename to factory? also with Query
-    NodeT: NodeType
+    NodeT: ItemType
     # todo: refactor update query and remove table field
     table: Table
     Query: type[QueryBase]
@@ -142,7 +142,7 @@ class NodeListBaseModel(ABC):
 
     async def update_existing(self):
         # todo: need refactor
-        mapping = {key: f'${i}' for i, key in enumerate(ImportNode.db_fields_set(self.NodeT) | {'import_id'}, start=1)}
+        mapping = {key: f'${i}' for i, key in enumerate(ImportItem.db_fields_set(self.NodeT) | {'import_id'}, start=1)}
 
         rows = [[(node.db_dict(self.import_id))[key] for key in mapping] for node in self.nodes if
                 node.id in self.exist_ids]
@@ -188,13 +188,13 @@ class NodeListBaseModel(ABC):
 
 
 class FileListModel(NodeListBaseModel):
-    NodeT = NodeType.FILE
+    NodeT = ItemType.FILE
     table = files_table
     Query = FileQuery
 
 
 class FolderListModel(NodeListBaseModel):
-    NodeT = NodeType.FOLDER
+    NodeT = ItemType.FOLDER
     table = folders_table
     Query = FolderQuery
 

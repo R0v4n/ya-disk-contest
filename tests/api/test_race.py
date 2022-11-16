@@ -1,8 +1,9 @@
 import asyncio
 from bisect import insort_right
-from datetime import datetime, timedelta
+from datetime import datetime
+from functools import partial
 from itertools import islice
-from random import sample, choice
+from random import sample
 from time import monotonic
 
 import pytest
@@ -13,7 +14,7 @@ from cloud.api.app import create_app
 from cloud.api.handlers import ImportsView, DeleteNodeView
 from cloud.api.model import ImportModel, ImportData, NodeModel
 from cloud.utils.testing import (post_import, del_node,
-                                 compare_db_fc_state, get_node, File, FakeCloudGen)
+                                 compare_db_fc_state, get_node, File, FakeCloudGen, random_schema)
 
 
 class QueueImportModel(ImportModel):
@@ -152,7 +153,7 @@ async def test_several_file_update_with_model(api_client, fake_cloud, postgres, 
 
 
 async def test_several_file_update_with_client(api_client, fake_cloud, sync_connection):
-    def make_imports(count=100):
+    def make_imports(count=10):
         fake_cloud.generate_import()
         f1 = File(size=10)
         fake_cloud.insert_item(f1)
@@ -177,41 +178,6 @@ async def test_several_file_update_with_client(api_client, fake_cloud, sync_conn
     compare_db_fc_state(sync_connection, fake_cloud)
 
 
-async def test_get_node(api_client, sync_connection):
-    cloud = FakeCloudGen()
-    cloud.generate_import([[[[[[[[[[[]]]]]]]]]]])
-
-    for _ in range(20):
-        cloud.random_import(schemas_count=200, allow_random_count=False, max_files_in_one_folder=1)
-        cloud.random_updates(count=100, allow_random_count=False)
-
-    import_corus = [post_import(api_client, data, url=QueueImportsView.URL_PATH)
-                    for data in cloud.imports_gen()]
-
-    debug(len(cloud.ids))
-
-    k = 3
-    if k > len(cloud.ids):
-        k = len(cloud.ids)
-
-    node_corus = [get_node(api_client, i) for i in sample(cloud.ids, k)]
-
-    async def gather_requests(reqs_corus):
-        t0 = monotonic()
-        res = await asyncio.gather(*reqs_corus, return_exceptions=True)
-        # for c in node_corus:
-        #     await c
-        dt = monotonic() - t0
-        debug(dt)
-
-        return res
-
-    debug(await gather_requests(import_corus))
-    debug(await gather_requests(node_corus))
-
-    compare_db_fc_state(sync_connection, cloud)
-
-
 def batched(iterable, n):
     """Batch data into lists of length n. The last batch may be shorter."""
     it = iter(iterable)
@@ -226,9 +192,10 @@ async def test_post_and_delete(api_client, sync_connection):
     def make_imports(count=10):
         cloud.generate_import([[[[[[[[[[[]]]]]]]]]]])
         each_import_ids.append(cloud.ids)
+        schema_gen = partial(random_schema, max_files_in_one_folder=2)
 
         for _ in range((count - 1) // 2):
-            cloud.random_import(schemas_count=10, allow_random_count=False, max_files_in_one_folder=2)
+            cloud.random_import(schemas_count=10, schema_gen_func=schema_gen, allow_random_count=False)
             cloud.random_updates(count=5, allow_random_count=False)
             each_import_ids.append(cloud.ids)
 
@@ -236,7 +203,7 @@ async def test_post_and_delete(api_client, sync_connection):
             each_import_ids.append(cloud.ids)
 
         if count % 2 == 0:
-            cloud.random_import(schemas_count=10, allow_random_count=False, max_files_in_one_folder=2)
+            cloud.random_import(schemas_count=10, schema_gen_func=schema_gen, allow_random_count=False)
             each_import_ids.append(cloud.ids)
 
         return cloud.imports_gen()
@@ -269,7 +236,7 @@ async def test_post_and_delete(api_client, sync_connection):
     batch_len = 3
 
     t0 = monotonic()
-    imports = make_imports(100)
+    imports = make_imports(50)
     t1 = monotonic()
     debug(t1 - t0)
     for i, batch in enumerate(batched(imports, batch_len)):
@@ -282,24 +249,3 @@ async def test_post_and_delete(api_client, sync_connection):
 
     compare_db_fc_state(sync_connection, cloud)
 
-
-def test_dict():
-    n = 10000
-    d = dict(zip(range(n), range(n)))
-    s = set(range(n))
-
-    def t(d):
-        t0 = monotonic()
-        for _ in range(10000):
-            tuple(d)
-        t1 = monotonic()
-        debug(t1 - t0)
-
-    t(d.keys())
-    t(s)
-
-
-def test_td():
-    d1 = datetime.now()
-    d2 = d1 + timedelta(hours=1)
-    print((d2-d1)*0.43+d1)

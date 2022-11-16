@@ -1,6 +1,6 @@
 from sqlalchemy import (
-    Column, DateTime, ForeignKey, ForeignKeyConstraint, Integer,
-    String, Table, MetaData
+    Column, DateTime, ForeignKey, ForeignKeyConstraint,
+    Integer, String, Table, MetaData
 )
 
 # todo: read about

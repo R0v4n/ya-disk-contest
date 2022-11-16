@@ -35,6 +35,7 @@ class User(HttpUser):
 
     @classmethod
     def next_import_date(cls):
+        # less timedelta will cause huge updates response size.
         cls._last_import_date += timedelta(hours=randint(3, 72))
         return cls._last_import_date
 
@@ -42,8 +43,7 @@ class User(HttpUser):
         self.cloud.random_import(
             schemas_count=2,
             date=self.next_import_date(),
-            allow_random_count=True,
-            max_files_in_one_folder=8
+            allow_random_count=True
         )
         self.cloud.random_updates(count=5, allow_random_count=True)
         return self.cloud.get_import_dict()

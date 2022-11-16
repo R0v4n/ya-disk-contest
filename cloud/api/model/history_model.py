@@ -1,13 +1,10 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from asyncpg import Record
 from asyncpgsa import PG
-from pydantic import ValidationError
 
-from cloud.api.model.query_builder import FileQuery, FolderQuery
-from cloud.api.model.data_classes import ExportNode, NodeType
-from cloud.utils.pg import DEFAULT_PG_URL
+from .data_classes import ExportItem, ItemType
+from .query_builder import FileQuery
 
 
 class HistoryModel:
@@ -23,31 +20,8 @@ class HistoryModel:
         query = FileQuery.select_updates_daterange(date_start, self.date_end)
 
         res = await self.conn.fetch(query)
-        nodes = [ExportNode(type=NodeType.FILE, **rec).dict(by_alias=True) for rec in res]
+
+        # todo: do i really need using ExportItem here? performance?
+        #  json payloads?
+        nodes = [ExportItem(type=ItemType.FILE, **rec).dict(by_alias=True) for rec in res]
         return nodes
-
-
-if __name__ == '__main__':
-    import asyncio
-    from devtools import debug
-
-
-    async def get_node():
-        pg = PG()
-        await pg.init(DEFAULT_PG_URL)
-
-        de = datetime.fromisoformat('2022-02-03 12:00:00 +00:00')
-
-        mdl = HistoryModel(pg, date_end=de)
-        try:
-            nodes = await mdl.get_files_updates_24h()
-        except ValidationError as err:
-            debug(err)
-        debug(nodes)
-
-
-    async def main():
-        await get_node()
-
-
-    asyncio.run(main())

@@ -4,9 +4,10 @@ from deepdiff import DeepDiff
 from devtools import debug
 from sqlalchemy.engine import Connection
 
-from cloud.api.model import NodeType
+from cloud.api.model import ItemType
 from cloud.db.schema import imports_table, folders_table, files_table, folder_history, file_history
-from cloud.utils.testing import FakeCloud, get_node
+from .fake_cloud import FakeCloud
+from .api_methods import get_node
 
 
 def import_dataset(connection: Connection, dataset: dict):
@@ -16,15 +17,15 @@ def import_dataset(connection: Connection, dataset: dict):
     query = imports_table.insert().values({'date': dataset['updateDate']}).returning(imports_table.c.id)
     import_id = connection.execute(query).scalar()
 
-    folders = [n for n in items if n['type'] == NodeType.FOLDER.value]
-    files = [n for n in items if n['type'] == NodeType.FILE.value]
+    folders = [n for n in items if n['type'] == ItemType.FOLDER.value]
+    files = [n for n in items if n['type'] == ItemType.FILE.value]
 
     def prepare_dicts(nodes: list[dict]):
         for n in nodes:
             t = n.pop('type')
             if 'parentId' in n:
                 n['parent_id'] = n.pop('parentId')
-            if t == NodeType.FOLDER.value:
+            if t == ItemType.FOLDER.value:
                 if 'url' in n:
                     n.pop('url')
                 n['size'] = 0
@@ -42,15 +43,15 @@ def import_dataset(connection: Connection, dataset: dict):
     return import_id
 
 
-def get_history_records(connection: Connection, type_: NodeType):
+def get_history_records(connection: Connection, type_: ItemType):
     """get all records from history table"""
-    table = {NodeType.FOLDER: folder_history, NodeType.FILE: file_history}
+    table = {ItemType.FOLDER: folder_history, ItemType.FILE: file_history}
     return [dict(row) for row in connection.execute(table[type_].select())]
 
 
-def get_node_records(connection: Connection, type_: NodeType):
+def get_node_records(connection: Connection, type_: ItemType):
     """get all records from node table"""
-    table = {NodeType.FOLDER: folders_table, NodeType.FILE: files_table}
+    table = {ItemType.FOLDER: folders_table, ItemType.FILE: files_table}
     return [dict(row) for row in connection.execute(table[type_].select())]
 
 
@@ -82,15 +83,15 @@ def compare_db_fc_state(connection: Connection, fake_cloud: FakeCloud):
 
     compare(received_imports, expected_imports, 'imports:', ignore_order=True)
 
-    received_files = get_node_records(connection, NodeType.FILE)
-    received_folders = get_node_records(connection, NodeType.FOLDER)
+    received_files = get_node_records(connection, ItemType.FILE)
+    received_folders = get_node_records(connection, ItemType.FOLDER)
     expected_files, expected_folders = fake_cloud.get_raw_db_node_records()
     compare(received_files, expected_files, 'files:', ignore_order=True)
 
     compare(received_folders, expected_folders, 'folders:', ignore_order=True)
 
-    received_file_history = get_history_records(connection, NodeType.FILE)
-    received_folder_history = get_history_records(connection, NodeType.FOLDER)
+    received_file_history = get_history_records(connection, ItemType.FILE)
+    received_folder_history = get_history_records(connection, ItemType.FOLDER)
     expected_file_history, expected_folder_history = fake_cloud.get_raw_db_history_records()
 
     compare(received_file_history, expected_file_history, 'file history:', ignore_order=True)
