@@ -1,7 +1,9 @@
 import argparse
 import os
 from alembic.config import CommandLine
-from cloud.utils.pg import DEFAULT_PG_DSN, make_alembic_config
+
+from cloud.api.settings import default_settings
+from cloud.utils.pg import make_alembic_config
 
 
 def main():
@@ -9,9 +11,10 @@ def main():
 
     alembic = CommandLine()
     alembic.parser.formatter_class = argparse.ArgumentDefaultsHelpFormatter
+
     alembic.parser.add_argument(
-        '--pg-url', default=os.getenv('CLOUD_PG_URL', DEFAULT_PG_DSN),
-        help='Database URL [env var: CLOUD_PG_URL]'
+        '--pg-dsn', default=os.getenv('CLOUD_PG_DSN', default_settings.pg_dsn),
+        help='Database URL [env var: CLOUD_PG_DSN]'
     )
 
     options = alembic.parser.parse_args()

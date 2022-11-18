@@ -6,17 +6,18 @@ from alembic.config import Config
 from asyncpgsa import PG
 from configargparse import Namespace
 
-DEFAULT_PG_DSN = 'postgresql://rovan:hackme@localhost:5432/cloud'
+from cloud.api.settings import Settings
+
 
 CLOUD_PATH = Path(__file__).parent.parent.resolve()
 
 
-async def pg_context(app: Application, args: Namespace):
+async def pg_context(app: Application, args: Settings):
     # todo: add logging
 
     app['pg'] = PG()
     await app['pg'].init(
-        str(args.pg_url),
+        str(args.pg_dsn),
         min_size=args.pg_pool_min_size,
         max_size=args.pg_pool_max_size
     )

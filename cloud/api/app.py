@@ -7,11 +7,12 @@ from aiohttp_pydantic import oas
 from cloud.utils.pg import pg_context
 from .handlers import HANDLERS
 from .middleware import error_middleware
+from .settings import Settings
 
 
 # todo: add logging
 
-def create_app(args: Namespace) -> Application:
+def create_app(args: Settings) -> Application:
 
     app = Application(middlewares=[error_middleware])
     oas.setup(app)

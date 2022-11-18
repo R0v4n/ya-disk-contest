@@ -2,9 +2,8 @@ import pytest
 from alembic.command import upgrade
 from sqlalchemy import create_engine
 
-from cloud.api.__main__ import parser
 from cloud.api.app import create_app
-from cloud.utils.testing import FakeCloud, post_import
+from cloud.api.settings import Settings
 
 
 @pytest.fixture
@@ -15,15 +14,9 @@ async def migrated_postgres(alembic_config, postgres):
 
 @pytest.fixture
 def arguments(aiomisc_unused_port, migrated_postgres):
-    return parser.parse_args(
-        [
-            # todo: add logging
-            # '--log-level=debug',
-            '--api-address=127.0.0.1',
-            f'--api-port={aiomisc_unused_port}',
-            f'--pg-url={migrated_postgres}'
-        ]
-    )
+    # todo: add logging
+    return Settings(api_port=aiomisc_unused_port, pg_dsn=migrated_postgres)
+
 
 
 @pytest.fixture

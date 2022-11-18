@@ -6,17 +6,18 @@ import pytest
 from sqlalchemy_utils import create_database, drop_database
 from yarl import URL
 
-from cloud.utils.pg import DEFAULT_PG_DSN, make_alembic_config
+from cloud.api.settings import default_settings
+from cloud.utils.pg import make_alembic_config
 from cloud.utils.testing import FakeCloud
 
 # fixme: CI?
-PG_URL = os.getenv('CLOUD_PG_URL', DEFAULT_PG_DSN)
+PG_DSN = os.getenv('CLOUD_PG_DSN', default_settings.pg_dsn)
 
 
 @pytest.fixture
 def postgres():
     tmp_name = f'{uuid.uuid4().hex}.pytest'
-    tmp_url = str(URL(PG_URL).with_path(tmp_name))
+    tmp_url = str(URL(PG_DSN).with_path(tmp_name))
     create_database(tmp_url)
 
     try:
