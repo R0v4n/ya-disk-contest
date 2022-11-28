@@ -1,9 +1,10 @@
+import logging
 from datetime import datetime, timezone, timedelta
 from http import HTTPStatus
 from random import choice, randint, uniform
 
-from locust import HttpUser, task, between
-from locust.exception import RescheduleTask
+from locust import HttpUser, task
+# from locust.exception import RescheduleTask
 
 from cloud.utils.testing import FakeCloudGen, url_for
 from cloud.api.handlers import ImportsView, DeleteNodeView, NodeView, UpdatesView, NodeHistoryView
@@ -25,17 +26,17 @@ class User(HttpUser):
             if resp.status_code != expected_status:
                 resp.failure(f'expected status {expected_status}, '
                              f'got {resp.status_code}')
-            # todo: add logging
-            # logging.info(
-            #     'round %r: %s %s, http status %d (expected %d), took %rs',
-            #     self.round, method, path, resp.status_code, expected_status,
-            #     resp.elapsed.total_seconds()
-            # )
+
+            logging.info(
+                '%s: %s, http status %d (expected %d), took %rs',
+                method, path, resp.status_code, expected_status,
+                resp.elapsed.total_seconds()
+            )
             return resp
 
     @classmethod
     def next_import_date(cls):
-        # less timedelta will cause huge updates response size.
+        # lesser timedelta will cause huge updates response size.
         cls._last_import_date += timedelta(hours=randint(3, 72))
         return cls._last_import_date
 

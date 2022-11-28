@@ -514,7 +514,6 @@ class FakeCloud:
 
         update(parent_id)
 
-    # todo: use TypeVar or Self with 3.11
     def _write_item_to_history(self, item: Item):
         history_ids = self._imports[-1].history_ids
         if item.id is not None and item.id not in history_ids:

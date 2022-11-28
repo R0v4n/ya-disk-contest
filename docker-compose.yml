@@ -1,10 +1,23 @@
 version: "3.9"
 services:
-  postgres:
+
+  db:
     image: postgres
     environment:
       POSTGRES_DB: "cloud"
-      POSTGRES_USER: "rovan"
-      POSTGRES_PASSWORD: "hackme"
+      POSTGRES_USER: "user"
+      POSTGRES_PASSWORD: "psw"
     ports:
       - "5432:5432"
+
+  api:
+    image: r0van/enrollment_autumn_2022
+    command:
+      - "cloud-api"
+    ports:
+      - "8081:8081"
+    environment:
+      CLOUD_PG_POOL_MAX_SIZE: 50
+      CLOUD_PG_DSN: "postgresql://user:psw@db:5432/cloud"
+
+

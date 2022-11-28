@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -5,6 +6,7 @@ from aiohttp.web_app import Application
 from alembic.config import Config
 from asyncpgsa import PG
 from configargparse import Namespace
+from yarl import URL
 
 from cloud.api.settings import Settings
 
@@ -12,8 +14,12 @@ from cloud.api.settings import Settings
 CLOUD_PATH = Path(__file__).parent.parent.resolve()
 
 
+logger = logging.getLogger(__name__)
+
+
 async def pg_context(app: Application, args: Settings):
-    # todo: add logging
+    db_info = URL(args.pg_dsn).with_password('***')
+    logger.info('Connecting to database: %s', db_info)
 
     app['pg'] = PG()
     await app['pg'].init(
@@ -23,10 +29,14 @@ async def pg_context(app: Application, args: Settings):
     )
 
     await app['pg'].fetchval('SELECT 1')
+    logger.info('Connected to database %s', db_info)
 
-    yield
-
-    await app['pg'].pool.close()
+    try:
+        yield
+    finally:
+        logger.info('Disconnecting from database %s', db_info)
+        await app['pg'].pool.close()
+        logger.info('Disconnected from database %s', db_info)
 
 
 def make_alembic_config(cmd_opts: Namespace | SimpleNamespace, base_path: str | Path = CLOUD_PATH) -> Config:
@@ -45,7 +55,7 @@ def make_alembic_config(cmd_opts: Namespace | SimpleNamespace, base_path: str | 
     alembic_dir = Path(config.get_main_option('script_location'))
     if not alembic_dir.is_absolute():
         config.set_main_option('script_location', str(base_path / alembic_dir))
-    if cmd_opts.pg_url:
-        config.set_main_option('sqlalchemy.url', cmd_opts.pg_url)
+    if cmd_opts.pg_dsn:
+        config.set_main_option('sqlalchemy.url', cmd_opts.pg_dsn)
 
     return config

@@ -1,3 +1,4 @@
+import logging
 import argparse
 import os
 from alembic.config import CommandLine
@@ -7,7 +8,7 @@ from cloud.utils.pg import make_alembic_config
 
 
 def main():
-    # todo: add logging
+    logging.basicConfig(level=logging.DEBUG)
 
     alembic = CommandLine()
     alembic.parser.formatter_class = argparse.ArgumentDefaultsHelpFormatter

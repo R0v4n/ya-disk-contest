@@ -13,21 +13,26 @@ async def migrated_postgres(alembic_config, postgres):
 
 
 @pytest.fixture
-def arguments(aiomisc_unused_port, migrated_postgres):
-    # todo: add logging
-    return Settings(api_port=aiomisc_unused_port, pg_dsn=migrated_postgres)
-
+def arguments(aiomisc_unused_port, migrated_postgres: str):
+    return Settings(
+        api_address='127.0.0.1',
+        api_port=aiomisc_unused_port,
+        pg_dsn=migrated_postgres,
+        log_level='debug'
+    )
 
 
 @pytest.fixture
 async def api_client(aiohttp_client, arguments):
     app = create_app(arguments)
-    client = await aiohttp_client(app,
-                                  server_kwargs={
-                                      'host': arguments.api_address,
-                                      'port': arguments.api_port
-                                  }
-                                  )
+    # noinspection PyArgumentList
+    client = await aiohttp_client(
+        app,
+        server_kwargs={
+            'host': arguments.api_address,
+            'port': arguments.api_port
+        }
+    )
     try:
         yield client
     finally:
@@ -35,7 +40,7 @@ async def api_client(aiohttp_client, arguments):
 
 
 @pytest.fixture
-def sync_connection(migrated_postgres):
+def sync_connection(migrated_postgres: str):
     """
     sync connection to migrated db.
     """
@@ -46,6 +51,3 @@ def sync_connection(migrated_postgres):
     finally:
         conn.close()
         engine.dispose()
-
-
-

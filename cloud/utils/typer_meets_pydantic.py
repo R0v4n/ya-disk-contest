@@ -1,5 +1,7 @@
+from enum import Enum
 from types import FunctionType
 from itertools import zip_longest
+from typing import Callable, Any
 
 import typer
 from pydantic import ValidationError, BaseModel
@@ -30,13 +32,20 @@ class SettingsBase(BaseModel):
 
     @property
     def typer_annotations(self):
-        return {key: type(val) for key, val in self.dict().items()}
+        return {key: self._converted_type(val) for key, val in self.dict().items()}
+
+    @staticmethod
+    def _converted_type(value):
+        if type(value) in (int, bool, str) or isinstance(value, Enum):
+            return type(value)
+        else:
+            return str
 
 
 # todo: fix usage message
 def typer_entry_point(cli_options: SettingsBase):
     """
-    Convert the function in typer entry point.
+    Convert a function in typer entry point.
     Decorated function should have exactly one argument,
     that will receive cli_options instance with actual field values from env and cli (or defaults).
     Each cli_options field will be an option with default value in cli.
@@ -51,9 +60,11 @@ def typer_entry_point(cli_options: SettingsBase):
     :param cli_options: pydantic model.
     :returns: decorator that used for entry point functions.
     """
-
-    def change_signature(func: FunctionType):
-        """Convert function signature for typer. Each cli_options field will be a distinct kwarg."""
+    def change_signature(func: Callable[[SettingsBase], Any]):
+        """
+        Converting function signature for typer and validating values received from env and cli.
+        Each cli_options field will be a distinct kw maybe arg with default value in the wrapper signature.
+        """
 
         def wrapper():
             try:
@@ -65,24 +76,22 @@ def typer_entry_point(cli_options: SettingsBase):
                 func(settings)
 
         annotations = cli_options.typer_annotations
-        defaults = cli_options.typer_options
 
         code = wrapper.__code__.replace(
-            co_argcount=len(defaults),
+            co_argcount=len(annotations),
             co_varnames=tuple(annotations.keys()),
-            co_nlocals=len(defaults)
+            co_nlocals=len(annotations)
         )
         new = FunctionType(
             code,
             wrapper.__globals__,
             func.__name__,
-            argdefs=defaults,
+            argdefs=cli_options.typer_options,
             closure=wrapper.__closure__
         )
 
         new.__annotations__ = annotations
         new.__doc__ = func.__doc__
-
         return typer.run(new)
 
     return change_signature

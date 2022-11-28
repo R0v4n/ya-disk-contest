@@ -1,4 +1,4 @@
-# import logging
+import logging
 from http import HTTPStatus
 
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPException, HTTPInternalServerError, HTTPNotFound
@@ -10,8 +10,7 @@ from .handlers.payloads import dumps
 from .model import ParentIdValidationError
 
 
-# todo: add logging
-# log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def error_json_response(http_error_cls, message: str | None = None):
@@ -37,6 +36,6 @@ async def error_middleware(request: Request, handler):
     except HTTPException as err:
         return error_json_response(err.__class__, err.text)
 
-    except Exception as err:
-        # log.exception('Unhandled exception')
+    except Exception:
+        logger.exception('Unhandled exception')
         raise HTTPInternalServerError

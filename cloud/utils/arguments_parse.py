@@ -13,7 +13,6 @@ def validate(type_: Callable, constrain: Callable):
     return wrapper
 
 
-# todo: refactor?
 positive_int = validate(int, constrain=lambda x: x > 0)
 
 

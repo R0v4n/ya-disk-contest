@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections import defaultdict
-# todo: install python 3.11 and use Self
-from typing import Iterable, Mapping, Any, TypeVar  # , Self
+from typing import Iterable, Mapping, Any
 
 from .data_classes import ImportItem, ItemType, ExportItem, Item
 
-TNodeModel = TypeVar('TNodeModel', bound=Item)
 
 # todo: think about Tree interface
-
+# todo: install python 3.11 and use Self
 
 class TreeMixin(ABC):
 
@@ -23,7 +21,7 @@ class TreeMixin(ABC):
         """method of pydantic.BaseModel"""
 
     @classmethod
-    def from_records(cls, records: Iterable[Mapping[str, Any]]) -> list[TNodeModel]:
+    def from_records(cls, records: Iterable[Mapping[str, Any]]) -> list['Self']:
 
         nodes = (cls(**rec) for rec in records)
 
