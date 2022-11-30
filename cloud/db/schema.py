@@ -61,7 +61,6 @@ folder_history = Table(
     Column('folder_id', String, ForeignKey('folders.id', ondelete='CASCADE'), primary_key=True),
     Column('parent_id', String),
     Column('size', Integer, default=0),
-    ForeignKeyConstraint(('parent_id',), ('folders.id',), ondelete='CASCADE')
 )
 
 file_history = Table(

@@ -10,6 +10,16 @@ from .fake_cloud import FakeCloud
 from .api_methods import get_node
 
 
+__all__ = (
+    'import_dataset',
+    'get_history_records',
+    'get_node_records',
+    'get_imports_records',
+    'compare_db_fc_node_trees',
+    'compare_db_fc_state',
+)
+
+
 def import_dataset(connection: Connection, dataset: dict):
     """Direct data insertion into db, without calculating folder sizes and history."""
     items = dataset['items']
@@ -93,28 +103,20 @@ def compare_db_fc_state(connection: Connection, fake_cloud: FakeCloud):
     received_file_history = get_history_records(connection, ItemType.FILE)
     received_folder_history = get_history_records(connection, ItemType.FOLDER)
     expected_file_history, expected_folder_history = fake_cloud.get_raw_db_history_records()
-
     compare(received_file_history, expected_file_history, 'file history:', ignore_order=True)
 
-    compare(received_folder_history, received_folder_history, 'folder history:', ignore_order=True)
+    compare(received_folder_history, expected_folder_history, 'folder history:', ignore_order=True)
 
 
-async def compare_db_fc_node_trees(api_client, fake_cloud: FakeCloud, ids: Iterable[str] = None):
+async def compare_db_fc_node_trees(api_client, fake_cloud: FakeCloud,
+                                   ids: Iterable[str] = None, nullify_folder_sizes=True):
     if ids is None:
         ids = fake_cloud.ids
 
     for node_id in ids:
-        expected_tree = fake_cloud.get_tree(node_id, nullify_folder_sizes=True)
+        expected_tree = fake_cloud.get_tree(node_id, nullify_folder_sizes=nullify_folder_sizes)
         received_tree = await get_node(api_client, node_id)
 
         diff = DeepDiff(received_tree, expected_tree, ignore_order=True)
         assert diff == {}
 
-__all__ = (
-    'import_dataset',
-    'get_history_records',
-    'get_node_records',
-    'get_imports_records',
-    'compare_db_fc_node_trees',
-    'compare_db_fc_state',
-)

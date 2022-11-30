@@ -1,8 +1,8 @@
 """Initial
 
-Revision ID: 975952a03049
+Revision ID: b7a69fae644c
 Revises: 
-Create Date: 2022-11-01 17:01:54.256361
+Create Date: 2022-12-01 03:17:33.886025
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '975952a03049'
+revision = 'b7a69fae644c'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -49,7 +49,6 @@ def upgrade() -> None:
     sa.Column('size', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['folder_id'], ['folders.id'], name=op.f('fk__folder_history__folder_id__folders'), ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['import_id'], ['imports.id'], name=op.f('fk__folder_history__import_id__imports')),
-    sa.ForeignKeyConstraint(['parent_id'], ['folders.id'], name=op.f('fk__folder_history__parent_id__folders'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('import_id', 'folder_id', name=op.f('pk__folder_history'))
     )
     op.create_table('file_history',

@@ -1,11 +1,11 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from http import HTTPStatus
 
 import pytest
 from devtools import debug
 
-from cloud.utils.testing import post_import, FakeCloud, del_node, compare_db_fc_state, File
+from cloud.utils.testing import post_import, FakeCloud, del_node, compare_db_fc_state, File, get_node_history
 
 
 async def test_with_fake_cloud(api_client, sync_connection):
@@ -82,6 +82,24 @@ async def test_delete_old_parent(api_client, sync_connection):
 
     fake_cloud.generate_import()
     fake_cloud.update_item(f1.id, parent_id=None)
+    await post_import(api_client, fake_cloud.get_import_dict())
+
+    date = fake_cloud.del_item(d1.id)
+    await del_node(api_client, d1.id, date)
+
+    compare_db_fc_state(sync_connection, fake_cloud)
+
+
+async def test_delete_old_parent_for_folder(api_client, sync_connection, fake_cloud):
+    """Change folder parent folder, then del this folder. Folder should stay in history."""
+    fake_cloud.generate_import([[]])
+    await post_import(api_client, fake_cloud.get_import_dict())
+
+    d2 = fake_cloud[0, 0]
+    d1 = fake_cloud.get_node_copy('d1')
+
+    fake_cloud.generate_import()
+    fake_cloud.update_item(d2.id, parent_id=None)
     await post_import(api_client, fake_cloud.get_import_dict())
 
     date = fake_cloud.del_item(d1.id)
