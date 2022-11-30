@@ -29,7 +29,7 @@ async def api_client(aiohttp_client, arguments):
     client = await aiohttp_client(
         app,
         server_kwargs={
-            'host': arguments.api_address,
+            'host': str(arguments.api_address),
             'port': arguments.api_port
         }
     )

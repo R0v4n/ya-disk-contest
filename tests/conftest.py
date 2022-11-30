@@ -33,7 +33,7 @@ def alembic_config(postgres):
     cmd_options = SimpleNamespace(
         config='alembic.ini',
         name='alembic',
-        pg_url=postgres,
+        pg_dsn=postgres,
         raiseerr=False,
         x=None
     )
