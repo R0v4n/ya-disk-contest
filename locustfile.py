@@ -49,7 +49,7 @@ class User(HttpUser):
         self.cloud.random_updates(count=5, allow_random_count=True)
         return self.cloud.get_import_dict()
 
-    @task(1)
+    @task(7)
     def post_import(self):
         self.request('POST', ImportsView.URL_PATH, json=self.make_dataset())
 
@@ -65,7 +65,7 @@ class User(HttpUser):
             path = url_for(DeleteNodeView.URL_PATH, {'node_id': node_id}, {'date': date})
             self.request('DELETE', path, name='del_node')
 
-    @task(5)
+    @task(20)
     def get_node(self, node_id: str = None):
         if node_id is None:
             ids = self.cloud.ids
@@ -76,7 +76,7 @@ class User(HttpUser):
             path = url_for(NodeView.URL_PATH, {'node_id': node_id})
             self.request('GET', path, name='get_node')
 
-    @task(5)
+    @task(20)
     def get_node_history(self):
         ids = self.cloud.ids
         if ids:
@@ -94,7 +94,7 @@ class User(HttpUser):
             )
             self.request('GET', path, name='node_history')
 
-    @task(2)
+    @task(8)
     def get_updates(self):
         date = self._date_start + uniform(0, 1) * (self._last_import_date - self._date_start)
         date += timedelta(hours=randint(0, 24))
