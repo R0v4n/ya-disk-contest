@@ -42,10 +42,12 @@ def main(args: Settings):
         app = create_app(args)
         web.run_app(app, sock=sock)
 
-    forklib.fork(os.cpu_count(), worker, auto_restart=True)
-
-    # app = create_app(args)
-    # web.run_app(app, host=str(args.api_address), port=args.api_port)
+    if args.api_workers_count > 1:
+        setproctitle(f'[Master] {os.path.basename(argv[0])}')
+        forklib.fork(args.api_workers_count, worker, auto_restart=True)
+    else:
+        app = create_app(args)
+        web.run_app(app, sock=sock)
 
 
 if __name__ == '__main__':
