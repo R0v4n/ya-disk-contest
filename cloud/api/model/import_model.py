@@ -10,11 +10,11 @@ from asyncpgsa import PG
 from asyncpgsa.connection import SAConnection
 from sqlalchemy import Table
 
+from cloud.db.schema import folders_table, files_table
+from .base_model import BaseImportModel
 from .data_classes import ImportData, ItemType, ImportItem, ParentIdValidationError
 from .node_tree import ImportNodeTree
 from .query_builder import FileQuery, FolderQuery, QueryBase, ImportQuery
-from .base_model import BaseImportModel
-from cloud.db.schema import folders_table, files_table
 
 
 class ImportModel(BaseImportModel):
@@ -41,28 +41,41 @@ class ImportModel(BaseImportModel):
                 or await self.folders_mdl.any_id_exists(self.files_mdl.ids):
             raise HTTPBadRequest
 
-        self.queries = ImportQuery(self.files_mdl.exist_ids, self.folders_mdl.exist_ids, self.import_id)
+        self.queries = ImportQuery(self.files_mdl.existent_ids, self.folders_mdl.existent_ids, self.import_id)
 
     # todo: create BaseHistoryModel
     async def write_folders_history(self):
-        # todo: this could be done in queries
-        # all folders and their strict parents
-        ids_set = reduce(set.union, ({i.id, i.parent_id} for i in self.folders_mdl.nodes), set())
+        """
+        write in folder_history table folder records that will be updated during import:
+            1) new nodes existent parents
+            2) current parents for updating nodes
+            3) new existent parents for updating nodes
+            4) existing folders in import
+        """
+        # existent parents for updating folders will be unioned in select query
 
-        # union files parents
-        ids_set |= {i.parent_id for i in self.files_mdl.nodes} - {None}
+        # all folders and their new direct parents (4), (3)
+        ids_set = reduce(set.union, ({i.id, i.parent_id} for i in self.folders_mdl.nodes), set())
+        # union files new parents (3)
+        ids_set |= {i.parent_id for i in self.files_mdl.nodes}
+        # union files old parents (1), (2)
+        ids_set |= self.files_mdl.existent_parent_ids
+        # diff new folder
+        ids_set -= self.folders_mdl.new_ids
+        ids_set -= {None}
 
         if ids_set:
-            query = self.queries.recursive_parents(ids_set)
-            await self.folders_mdl.write_history(query)
+            folders_select = FolderQuery.select(ids_set)
+            parents = FolderQuery.recursive_parents(ids_set)
+            await self.folders_mdl.write_history(folders_select.union(parents))
 
     async def subtract_parents_size(self):
-        if self.files_mdl.exist_ids or self.folders_mdl.exist_ids:
+        if self.files_mdl.existent_ids or self.folders_mdl.existent_ids:
             await self.conn.execute(self.queries.update_folder_sizes(add=False))
 
     async def write_files_history(self):
-        if self.files_mdl.exist_ids:
-            select_q = FileQuery.select(self.files_mdl.exist_ids)
+        if self.files_mdl.existent_ids:
+            select_q = FileQuery.select(self.files_mdl.existent_ids)
             await self.files_mdl.write_history(select_q)
 
     async def insert_new_nodes(self):
@@ -72,9 +85,9 @@ class ImportModel(BaseImportModel):
             await self.files_mdl.insert_new()
 
     async def update_existing_nodes(self):
-        if self.folders_mdl.exist_ids:
+        if self.folders_mdl.existent_ids:
             await self.folders_mdl.update_existing()
-        if self.files_mdl.exist_ids:
+        if self.files_mdl.existent_ids:
             await self.files_mdl.update_existing()
 
     async def add_parents_size(self):
@@ -111,17 +124,21 @@ class NodeListBaseModel(ABC):
         self.nodes = [i for i in data.items if i.type == self.NodeT]
         self.ids = {node.id for node in self.nodes}
         self.new_ids = None
-        self.exist_ids = None
+        self.existent_ids = None
+        self.existent_parent_ids = None
 
     async def init(self):
-        self.exist_ids = await self.get_existing_ids()
-        self.new_ids = self.ids - self.exist_ids
+        self.existent_ids, self.existent_parent_ids = await self.get_existing_ids()
+        self.new_ids = self.ids - self.existent_ids
 
-    async def get_existing_ids(self):
-        query = self.Query.select(self.ids, ['id'])
+    async def get_existing_ids(self) -> tuple[set[str], set[str]]:
+        query = self.Query.select(self.ids, ['id', 'parent_id'])
         res = await self.conn.fetch(query)
-
-        return {row['id'] for row in res}
+        return reduce(
+            lambda s, x: (s[0] | {x['id']}, s[1] | {x['parent_id']}),
+            res,
+            (set(), set())
+        )
 
     async def any_id_exists(self, ids: Iterable[str]):
         return await self.conn.fetchval(self.Query.exist(ids))
@@ -145,7 +162,7 @@ class NodeListBaseModel(ABC):
         mapping = {key: f'${i}' for i, key in enumerate(ImportItem.db_fields_set(self.NodeT) | {'import_id'}, start=1)}
 
         rows = [[(node.db_dict(self.import_id))[key] for key in mapping] for node in self.nodes if
-                node.id in self.exist_ids]
+                node.id in self.existent_ids]
 
         id_param = mapping.pop('id')
 
@@ -168,7 +185,7 @@ class NodeListBaseModel(ABC):
         # print(bp_dict)
         # {k + '_': v for k, v in node.dict()}
         rows = [{k: v for k, v in node.dict().items()} | {'import_id': self.import_id} for node in self.nodes if
-                node.id in self.exist_ids]
+                node.id in self.existent_ids]
         # rows = [list(d.values()) for d in rows]
         # print(rows)
         # query = self.Query.update(bp_dict)

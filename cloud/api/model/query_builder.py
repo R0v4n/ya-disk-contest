@@ -8,10 +8,7 @@ from .data_classes import ItemType
 from cloud.db.schema import files_table, folder_history, folders_table, file_history, imports_table
 
 
-class QueryBase(ABC):
-    table: Table
-    history_table: Table
-    node_type: ItemType
+class CommonQueryMixin:
 
     @staticmethod
     def _build_columns(table: Table, columns: list[str | None] | None = None):
@@ -35,26 +32,6 @@ class QueryBase(ABC):
         return table.c.id.in_(ids)
 
     @classmethod
-    def select(cls, ids: Iterable[str] | str, columns: list[str] | None = None):
-        columns = cls._build_columns(cls.table, columns)
-
-        # todo: test efficiency of values table over IN
-        # str_ids = ', '.join(f"('{i}')" for i in ids)
-        #
-        # ids_cte = \
-        #     select([column('id', String)]). \
-        #     select_from(
-        #         text(f'(VALUES {str_ids}) as t (id)')
-        #     ).cte()
-        #
-        # query = files.select().where(files.c.id == ids_cte.c.id)
-
-        # todo: check efficiency. (value cte, exists?)
-
-        return select(columns).where(cls._ids_condition(cls.table, ids))
-
-    # todo: move to other class
-    @classmethod
     def select_join_date(cls, table: Table, condition=None, columns: list[str | None] | None = None):
         query = select(cls._build_columns(table, columns) + [imports_table.c.date]). \
             select_from(table.join(imports_table))
@@ -62,6 +39,17 @@ class QueryBase(ABC):
             query = query.where(condition)
 
         return query
+
+
+class QueryBase(ABC, CommonQueryMixin):
+    table: Table
+    history_table: Table
+    node_type: ItemType
+
+    @classmethod
+    def select(cls, ids: Iterable[str] | str, columns: list[str] | None = None):
+        columns = cls._build_columns(cls.table, columns)
+        return select(columns).where(cls._ids_condition(cls.table, ids))
 
     @classmethod
     def select_node_with_date(cls, node_id: str, columns: list[str | None] | None = None):
@@ -72,7 +60,7 @@ class QueryBase(ABC):
     def insert(cls, values: list[dict[str, Any]]):
         return cls.table.insert().values(values)
 
-    # todo: this is not used. check import_model
+    # note: this is not used. check import_model
     @classmethod
     def update(cls, bind_params):
         return cls.table.update(). \
@@ -80,41 +68,41 @@ class QueryBase(ABC):
             values(**bind_params)
 
     @classmethod
-    def select_parents_with_size(cls, ids: Iterable[str], add: bool = True):
+    def direct_parents_with_size(cls, ids: Iterable[str], add: bool = True):
         """
         Select direct parent folders for nodes with given ids.
         Third column in select is a total size of children with given ids for each parent.
         """
-        exists = cls.select(ids, ['parent_id', 'size']).alias()
+        children_alias = cls.select(ids, ['parent_id', 'size']).alias()
         sign = 1 if add else -1
 
         parents = \
             select([
                 folders_table.c.id,
                 folders_table.c.parent_id,
-                func.sum(sign * exists.c.size).label('size')
+                func.sum(sign * children_alias.c.size).label('size')
             ]). \
-                select_from(
+            select_from(
                 folders_table.join(
-                    exists,
-                    folders_table.c.id == exists.c.parent_id
+                    children_alias,
+                    folders_table.c.id == children_alias.c.parent_id
                 )
             ). \
-                group_by(folders_table.c.id, folders_table.c.parent_id)
+            group_by(folders_table.c.id, folders_table.c.parent_id)
 
         return parents
 
     @classmethod
-    def select_parents(cls, ids):
-        """select strict parents all fields. May contain duplicate records!!!"""
-        exists = cls.select(ids, ['parent_id']).alias()
+    def direct_parents(cls, ids, columns: list[str | None] | None = None):
+        """select direct parents. May contain duplicate records!"""
+        children_alias = cls.select(ids, ['parent_id']).alias()
 
         parents = \
-            select(folders_table.columns). \
-                select_from(
+            select(cls._build_columns(folders_table, columns)). \
+            select_from(
                 folders_table.join(
-                    exists,
-                    folders_table.c.id == exists.c.parent_id
+                    children_alias,
+                    folders_table.c.id == children_alias.c.parent_id
                 )
             )
 
@@ -133,35 +121,19 @@ class QueryBase(ABC):
         return cls.table.delete().where(cls.table.c.id == node_id)
 
     @classmethod
-    def recursive_parents(cls, node_id: str, columns: list[str] = None):
+    def recursive_parents(cls, ids: str | Iterable[str], columns: list[str] = None):
 
-        node_select = cls.select(node_id, ['parent_id']).alias()
-        first_parent_cte = select(cls._build_columns(folders_table, columns)). \
-            select_from(folders_table). \
-            where(folders_table.c.id == node_select). \
-            cte(recursive=True)
+        direct_parents = cls.direct_parents(ids, columns).cte(recursive=True)
 
         folders_alias = folders_table.alias()
-        included_alias = first_parent_cte.alias()
+        included_alias = direct_parents.alias()
 
-        parent_folders = first_parent_cte.union_all(
+        parent_folders = direct_parents.union_all(
             select(cls._build_columns(folders_alias, columns)).
             where(folders_alias.c.id == included_alias.c.parent_id)
         ).select()
 
         return parent_folders
-
-    @classmethod
-    def subtract_parents_size(cls, node_id: str):
-        size = cls.select(node_id, ['size'])
-
-        select_q = cls.recursive_parents(node_id).alias()
-
-        query = folders_table.update(). \
-            where(folders_table.c.id == select_q.c.id). \
-            values(size=folders_table.c.size - size)
-
-        return query
 
     @classmethod
     def select_nodes_union_history_in_daterange(cls, date_start: datetime, date_end: datetime,
@@ -246,8 +218,8 @@ class ImportQuery:
 
     def recursive_parents_with_size(self, add: bool = True):
         direct_parents = \
-            FileQuery.select_parents_with_size(self.file_ids, add). \
-                union_all(FolderQuery.select_parents_with_size(self.folder_ids, add)).alias()
+            FileQuery.direct_parents_with_size(self.file_ids, add). \
+            union_all(FolderQuery.direct_parents_with_size(self.folder_ids, add)).alias()
 
         parents_cte = select([
             direct_parents.c.id,
@@ -279,8 +251,8 @@ class ImportQuery:
                 [parents_recursive.c.id,
                  func.sum(parents_recursive.c.size).label('size')]
             ). \
-                select_from(parents_recursive). \
-                group_by(parents_recursive.c.id)
+            select_from(parents_recursive). \
+            group_by(parents_recursive.c.id)
 
         return all_parents
 
@@ -291,32 +263,6 @@ class ImportQuery:
             size=select_q.c.size + folders_table.c.size, import_id=self.import_id)
 
         return query
-
-    def recursive_parents(self, ids):
-        # todo: should empty folder addition considered an update for parent folders? what if folder delta_size==0?
-        """
-        select all folders that will be updated during import:
-            1) new nodes parents
-            2) current parents for updating nodes
-            3) new parents for updating nodes
-            4) existing folders in import
-        """
-        files_parents = FileQuery.select_parents(self.file_ids)
-
-        parents_cte = folders_table. \
-            select(). \
-            where(folders_table.c.id.in_(ids)). \
-            union(files_parents).alias().select().cte(recursive=True)
-
-        folders_alias = folders_table.alias()
-        parents_alias = parents_cte.alias()
-
-        # todo: move cte to separate method?
-        parent_folders = parents_cte.union(
-            select(folders_alias.columns).where(folders_alias.c.id == parents_alias.c.parent_id)
-        ).select()
-
-        return parent_folders
 
 
 class NodeQuery:

@@ -42,6 +42,7 @@ class NodeModel(BaseImportModel):
         return tree.dict(by_alias=True)
 
     async def _delete_node(self):
+        # todo: why arg node_id is str?
         query_class, file_id, folder_id = {
             ItemType.FILE: (FileQuery, self.node_id, []),
             ItemType.FOLDER: (FolderQuery, [], self.node_id)
@@ -49,7 +50,6 @@ class NodeModel(BaseImportModel):
 
         await self.insert_import()
 
-        # todo: this can be done with ImportQuery. Need Query classes refactor
         parents = query_class.recursive_parents(self.node_id)
         history_q = FolderQuery.insert_history_from_select(parents)
 

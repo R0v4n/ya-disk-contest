@@ -80,8 +80,8 @@ def compare(received, expected, obj_note=None, **kwargs):
     except AssertionError:
         if obj_note:
             debug(obj_note)
-        debug(received)
-        debug(expected)
+        # debug(received)
+        # debug(expected)
         debug(diff)
         raise
 
