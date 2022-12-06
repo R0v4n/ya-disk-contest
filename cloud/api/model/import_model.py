@@ -17,6 +17,7 @@ from .node_tree import ImportNodeTree
 from .query_builder import FileQuery, FolderQuery, QueryBase, ImportQuery
 
 
+# todo: add slots to models. check private methods everywhere
 class ImportModel(BaseImportModel):
 
     def __init__(self, data: ImportData, pg: PG):
