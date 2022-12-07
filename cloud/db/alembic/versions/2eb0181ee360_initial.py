@@ -1,8 +1,8 @@
 """Initial
 
-Revision ID: e2eef5c1807b
+Revision ID: 2eb0181ee360
 Revises: 
-Create Date: 2022-12-07 19:29:29.627287
+Create Date: 2022-12-07 21:15:36.265042
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'e2eef5c1807b'
+revision = '2eb0181ee360'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -28,7 +28,7 @@ def upgrade() -> None:
     sa.Column('import_id', sa.Integer(), nullable=True),
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('parent_id', sa.String(), nullable=True),
-    sa.Column('size', sa.Integer(), nullable=True),
+    sa.Column('size', sa.BigInteger(), nullable=True),
     sa.ForeignKeyConstraint(['import_id'], ['imports.id'], name=op.f('fk__folders__import_id__imports')),
     sa.ForeignKeyConstraint(['parent_id'], ['folders.id'], name=op.f('fk__folders__parent_id__folders'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk__folders'))
@@ -38,7 +38,7 @@ def upgrade() -> None:
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('parent_id', sa.String(), nullable=True),
     sa.Column('url', sa.String(length=255), nullable=False),
-    sa.Column('size', sa.Integer(), nullable=False),
+    sa.Column('size', sa.BigInteger(), nullable=False),
     sa.ForeignKeyConstraint(['import_id'], ['imports.id'], name=op.f('fk__files__import_id__imports')),
     sa.ForeignKeyConstraint(['parent_id'], ['folders.id'], name=op.f('fk__files__parent_id__folders'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk__files'))
@@ -47,7 +47,7 @@ def upgrade() -> None:
     sa.Column('import_id', sa.Integer(), nullable=False),
     sa.Column('folder_id', sa.String(), nullable=False),
     sa.Column('parent_id', sa.String(), nullable=True),
-    sa.Column('size', sa.Integer(), nullable=True),
+    sa.Column('size', sa.BigInteger(), nullable=True),
     sa.ForeignKeyConstraint(['folder_id'], ['folders.id'], name=op.f('fk__folder_history__folder_id__folders'), ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['import_id'], ['imports.id'], name=op.f('fk__folder_history__import_id__imports')),
     sa.PrimaryKeyConstraint('import_id', 'folder_id', name=op.f('pk__folder_history'))
@@ -57,7 +57,7 @@ def upgrade() -> None:
     sa.Column('file_id', sa.String(), nullable=False),
     sa.Column('parent_id', sa.String(), nullable=True),
     sa.Column('url', sa.String(length=255), nullable=False),
-    sa.Column('size', sa.Integer(), nullable=False),
+    sa.Column('size', sa.BigInteger(), nullable=False),
     sa.ForeignKeyConstraint(['file_id'], ['files.id'], name=op.f('fk__file_history__file_id__files'), ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['import_id'], ['imports.id'], name=op.f('fk__file_history__import_id__imports')),
     sa.PrimaryKeyConstraint('import_id', 'file_id', name=op.f('pk__file_history'))

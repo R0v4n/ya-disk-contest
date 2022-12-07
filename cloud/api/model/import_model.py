@@ -14,7 +14,7 @@ from cloud.db.schema import folders_table, files_table
 from .base_model import BaseImportModel
 from .data_classes import ImportData, ItemType, ImportItem, ParentIdValidationError
 from .node_tree import ImportNodeTree
-from .query_builder import FileQuery, FolderQuery, QueryBase, ImportQuery
+from .query_builder import FileQuery, FolderQuery, QueryBase
 
 
 # todo: add slots to models. check private methods everywhere
@@ -27,7 +27,6 @@ class ImportModel(BaseImportModel):
 
         self.files_mdl: FileListModel | None = None
         self.folders_mdl: FolderListModel | None = None
-        self.queries: ImportQuery | None = None
 
     async def init(self):
         await self.insert_import()
@@ -41,8 +40,6 @@ class ImportModel(BaseImportModel):
         if await self.files_mdl.any_id_exists(self.folders_mdl.ids) \
                 or await self.folders_mdl.any_id_exists(self.files_mdl.ids):
             raise HTTPBadRequest
-
-        self.queries = ImportQuery(self.files_mdl.existent_ids, self.folders_mdl.existent_ids, self.import_id)
 
     # todo: create BaseHistoryModel
     async def write_folders_history(self):
@@ -72,7 +69,14 @@ class ImportModel(BaseImportModel):
 
     async def subtract_parents_size(self):
         if self.files_mdl.existent_ids or self.folders_mdl.existent_ids:
-            await self.conn.execute(self.queries.update_folder_sizes(add=False))
+            await self.conn.execute(
+                FolderQuery.update_parent_sizes(
+                    self.files_mdl.existent_ids,
+                    self.folders_mdl.existent_ids,
+                    self.import_id,
+                    False
+                )
+            )
 
     async def write_files_history(self):
         if self.files_mdl.existent_ids:
@@ -92,10 +96,13 @@ class ImportModel(BaseImportModel):
             await self.files_mdl.update_existing()
 
     async def add_parents_size(self):
-        # todo: do i need refactor?
-        query = ImportQuery(self.files_mdl.ids, self.folders_mdl.ids, self.import_id).update_folder_sizes()
-
-        await self.conn.execute(query)
+        await self.conn.execute(
+            FolderQuery.update_parent_sizes(
+                self.files_mdl.ids,
+                self.folders_mdl.ids,
+                self.import_id
+            )
+        )
 
     async def execute_post_import(self):
         await self.execute_in_transaction(

@@ -7,7 +7,7 @@ from asyncpgsa import PG
 from .base_model import BaseImportModel
 from .data_classes import ItemType, ExportItem
 from .node_tree import ExportNodeTree
-from .query_builder import FileQuery, FolderQuery, ImportQuery
+from .query_builder import FileQuery, FolderQuery
 
 
 class NodeModel(BaseImportModel):
@@ -39,18 +39,18 @@ class NodeModel(BaseImportModel):
         return tree.dict(by_alias=True)
 
     async def _delete_node(self):
-        # todo: why arg node_id is str?
-        query_class, file_id, folder_id = {
-            ItemType.FILE: (FileQuery, self.node_id, []),
-            ItemType.FOLDER: (FolderQuery, [], self.node_id)
-        }[await self._get_node_type(self.conn)]
+
+        if await self._get_node_type(self.conn) == ItemType.FILE:
+            query_class, file_id, folder_id = FileQuery, self.node_id, []
+        else:
+            query_class, file_id, folder_id = FolderQuery, [], self.node_id
 
         await self.insert_import()
 
         parents = query_class.recursive_parents(self.node_id)
         history_q = FolderQuery.insert_history_from_select(parents)
 
-        update_q = ImportQuery(file_id, folder_id, self.import_id).update_folder_sizes(add=False)
+        update_q = FolderQuery.update_parent_sizes(file_id, folder_id, self.import_id, add=False)
 
         await self.conn.execute(history_q)
         await self.conn.execute(update_q)

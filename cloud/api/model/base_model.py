@@ -5,7 +5,7 @@ from aiohttp.web_exceptions import HTTPBadRequest
 from asyncpgsa import PG
 from asyncpgsa.connection import SAConnection
 
-from .query_builder import ImportQuery
+from .query_builder import insert_import_query
 
 
 class BaseImportModel:
@@ -52,6 +52,4 @@ class BaseImportModel:
         return self._import_id
 
     async def insert_import(self):
-        query = ImportQuery.insert_import(self.date)
-
-        self._import_id = await self.conn.fetchval(query)
+        self._import_id = await self.conn.fetchval(insert_import_query(self.date))

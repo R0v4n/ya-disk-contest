@@ -9,6 +9,10 @@ from cloud.db.schema import files_table, folder_history, folders_table, file_his
 from .data_classes import ItemType
 
 
+def insert_import_query(date: datetime):
+    return imports_table.insert().values({'date': date}).returning(imports_table.c.id)
+
+
 class CommonQueryMixin:
 
     @staticmethod
@@ -44,6 +48,8 @@ class CommonQueryMixin:
 
 
 class QueryBase(ABC, CommonQueryMixin):
+    """Base functor class for queries"""
+
     table: Table
     history_table: Table
     node_type: ItemType
@@ -140,6 +146,8 @@ class QueryBase(ABC, CommonQueryMixin):
 
 
 class FolderQuery(QueryBase):
+    """Functor class for folder_table queries"""
+
     table = folders_table
     history_table = folder_history
     node_type = ItemType.FOLDER
@@ -181,29 +189,12 @@ class FolderQuery(QueryBase):
 
         return query
 
-
-class FileQuery(QueryBase):
-    table = files_table
-    history_table = file_history
-    node_type = ItemType.FILE
-
-
-class ImportQuery:
-
-    def __init__(self, file_ids, folder_ids, import_id):
-        self.import_id = import_id
-        self.file_ids = file_ids
-        self.folder_ids = folder_ids
-
     @classmethod
-    def insert_import(cls, date: datetime):
-        return imports_table.insert().values({'date': date}).returning(imports_table.c.id)
-
-    def recursive_parents_with_size(self, add: bool = True):
+    def recursive_parents_with_size(cls, file_ids, folder_ids, add: bool = True):
 
         direct_parents = union_all(
-            FileQuery.direct_parents(self.file_ids, ['id', 'parent_id', files_table.c.size]),
-            FolderQuery.direct_parents(self.folder_ids, ['id', 'parent_id', folders_table.c.size])
+            FileQuery.direct_parents(file_ids, ['id', 'parent_id', files_table.c.size]),
+            cls.direct_parents(folder_ids, ['id', 'parent_id', folders_table.c.size])
         ).alias()
 
         sign = 1 if add else -1
@@ -222,7 +213,7 @@ class ImportQuery:
         join_condition = (folders_alias.c.id == parents_alias.c.parent_id)
         if not add:
             # if two nodes (one child of another) was moved from one branch.
-            join_condition &= ~ parents_alias.c.id.in_(self.folder_ids)
+            join_condition &= ~ parents_alias.c.id.in_(folder_ids)
 
         parents_recursive = parents_cte.union_all(
             select([
@@ -243,10 +234,27 @@ class ImportQuery:
 
         return all_parents
 
-    def update_folder_sizes(self, add: bool = True):
-        select_q = self.recursive_parents_with_size(add).alias()
+    @classmethod
+    def update_parent_sizes(
+            cls,
+            file_ids: Iterable[str] | str,
+            folder_ids: Iterable[str] | str,
+            import_id: int,
+            add: bool = True):
+
+        select_q = cls.recursive_parents_with_size(file_ids, folder_ids, add).alias()
 
         query = folders_table.update().where(folders_table.c.id == select_q.c.id).values(
-            size=select_q.c.size + folders_table.c.size, import_id=self.import_id)
+            size=select_q.c.size + folders_table.c.size, import_id=import_id)
 
         return query
+
+
+class FileQuery(QueryBase):
+    """Functor class for file_table queries"""
+
+    table = files_table
+    history_table = file_history
+    node_type = ItemType.FILE
+
+

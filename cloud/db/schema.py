@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, DateTime, ForeignKey, ForeignKeyConstraint,
-    Integer, String, Table, MetaData
+    Integer, BigInteger, String, Table, MetaData
 )
 
 # todo: read about
@@ -40,7 +40,7 @@ folders_table = Table(
     Column('import_id', Integer, ForeignKey('imports.id')),
     Column('id', String, primary_key=True),
     Column('parent_id', String),
-    Column('size', Integer, default=0),
+    Column('size', BigInteger, default=0),
     ForeignKeyConstraint(('parent_id',), ('folders.id',), ondelete='CASCADE')
 )
 
@@ -51,7 +51,7 @@ files_table = Table(
     Column('id', String, primary_key=True),
     Column('parent_id', String, ForeignKey('folders.id', ondelete='CASCADE')),
     Column('url', String(255), nullable=False),
-    Column('size', Integer, nullable=False),
+    Column('size', BigInteger, nullable=False),
 )
 
 folder_history = Table(
@@ -60,7 +60,7 @@ folder_history = Table(
     Column('import_id', Integer, ForeignKey('imports.id'), primary_key=True),
     Column('folder_id', String, ForeignKey('folders.id', ondelete='CASCADE'), primary_key=True),
     Column('parent_id', String),
-    Column('size', Integer, default=0),
+    Column('size', BigInteger, default=0),
 )
 
 file_history = Table(
@@ -70,5 +70,5 @@ file_history = Table(
     Column('file_id', String, ForeignKey('files.id', ondelete='CASCADE'), primary_key=True),
     Column('parent_id', String),
     Column('url', String(255), nullable=False),
-    Column('size', Integer, nullable=False),
+    Column('size', BigInteger, nullable=False),
 )
