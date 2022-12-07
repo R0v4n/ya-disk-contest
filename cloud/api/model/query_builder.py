@@ -2,7 +2,7 @@ from abc import ABC
 from datetime import datetime
 from typing import Iterable, Any
 
-from sqlalchemy import Table, select, func, exists, literal_column, String
+from sqlalchemy import Table, select, func, exists, literal_column, String, union_all
 from sqlalchemy.sql.elements import Null
 
 from cloud.db.schema import files_table, folder_history, folders_table, file_history, imports_table
@@ -24,6 +24,7 @@ class CommonQueryMixin:
         if type(ids) == str:
             return table.c.id == ids
 
+        # todo: does it make sense?
         if len(ids) == 1:
             if isinstance(ids, set):
                 return table.c.id == ids.copy().pop()
@@ -69,7 +70,7 @@ class QueryBase(ABC, CommonQueryMixin):
             values(**bind_params)
 
     @classmethod
-    def direct_parents(cls, ids, columns: list[str | None] | None = None, group_cols: list[str] = None):
+    def direct_parents(cls, ids, columns: list[str | None] | None = None):
         """select direct parents. May contain duplicate records!"""
 
         folders_alias = folders_table.alias()
@@ -83,21 +84,7 @@ class QueryBase(ABC, CommonQueryMixin):
                 )
             ).where(cls._ids_condition(cls.table, ids))
 
-        if group_cols:
-            parents = parents.group_by(*cls._build_columns(folders_alias, group_cols))
-
         return parents
-
-    @classmethod
-    def direct_parents_with_size(cls, ids: Iterable[str], add: bool = True):
-        """
-        Select direct parent folders for nodes with given ids.
-        Third column in select is a total size of children with given ids for each parent.
-        """
-        sign = 1 if add else -1
-        cols = ['id', 'parent_id', func.sum(sign * cls.table.c.size).label('size')]
-
-        return cls.direct_parents(ids, cols, group_cols=['id', 'parent_id'])
 
     @classmethod
     def insert_history_from_select(cls, select_q):
@@ -214,16 +201,19 @@ class ImportQuery:
         return imports_table.insert().values({'date': date}).returning(imports_table.c.id)
 
     def recursive_parents_with_size(self, add: bool = True):
-        # todo: does it make sense to grouping direct parents?
-        direct_parents = \
-            FileQuery.direct_parents_with_size(self.file_ids, add). \
-            union_all(FolderQuery.direct_parents_with_size(self.folder_ids, add)).alias()
+
+        direct_parents = union_all(
+            FileQuery.direct_parents(self.file_ids, ['id', 'parent_id', files_table.c.size]),
+            FolderQuery.direct_parents(self.folder_ids, ['id', 'parent_id', folders_table.c.size])
+        ).alias()
+
+        sign = 1 if add else -1
 
         parents_cte = \
             select([
                 direct_parents.c.id,
                 direct_parents.c.parent_id,
-                func.sum(direct_parents.c.size).label('size')
+                func.sum(sign*direct_parents.c.size).label('size')
             ]). \
             group_by(direct_parents.c.id, direct_parents.c.parent_id).cte(recursive=True)
 
