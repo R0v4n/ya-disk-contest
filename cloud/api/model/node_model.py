@@ -54,7 +54,6 @@ class NodeModel(BaseImportModel):
 
         await self.conn.execute(history_q)
         await self.conn.execute(update_q)
-        # await self.conn.execute(query_class.subtract_parents_size(self.node_id))
         await self.conn.execute(query_class.delete(self.node_id))
 
     async def execute_del_node(self):

@@ -67,6 +67,7 @@ class User(HttpUser):
 
     @task(20)
     def get_node(self, node_id: str = None):
+        # todo: get only folders
         if node_id is None:
             ids = self.cloud.ids
             if ids:

@@ -5,7 +5,6 @@ from devtools import debug
 from cloud.utils.testing import post_import, del_node, FakeCloudGen, compare_db_fc_state
 
 
-# todo: as it turned out i have another bug in folder history. It was also hidden due to the compare bug
 async def test(api_client, sync_connection):
     fake_cloud = FakeCloudGen()
 

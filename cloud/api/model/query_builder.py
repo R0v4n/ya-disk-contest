@@ -69,45 +69,35 @@ class QueryBase(ABC, CommonQueryMixin):
             values(**bind_params)
 
     @classmethod
+    def direct_parents(cls, ids, columns: list[str | None] | None = None, group_cols: list[str] = None):
+        """select direct parents. May contain duplicate records!"""
+
+        folders_alias = folders_table.alias()
+
+        parents = \
+            select(cls._build_columns(folders_alias, columns)). \
+            select_from(
+                folders_alias.join(
+                    cls.table,
+                    cls.table.c.parent_id == folders_alias.c.id
+                )
+            ).where(cls._ids_condition(cls.table, ids))
+
+        if group_cols:
+            parents = parents.group_by(*cls._build_columns(folders_alias, group_cols))
+
+        return parents
+
+    @classmethod
     def direct_parents_with_size(cls, ids: Iterable[str], add: bool = True):
         """
         Select direct parent folders for nodes with given ids.
         Third column in select is a total size of children with given ids for each parent.
         """
-        children_alias = cls.select(ids, ['parent_id', 'size']).alias()
         sign = 1 if add else -1
+        cols = ['id', 'parent_id', func.sum(sign * cls.table.c.size).label('size')]
 
-        parents = \
-            select([
-                folders_table.c.id,
-                folders_table.c.parent_id,
-                func.sum(sign * children_alias.c.size).label('size')
-            ]). \
-                select_from(
-                folders_table.join(
-                    children_alias,
-                    folders_table.c.id == children_alias.c.parent_id
-                )
-            ). \
-                group_by(folders_table.c.id, folders_table.c.parent_id)
-
-        return parents
-
-    @classmethod
-    def direct_parents(cls, ids, columns: list[str | None] | None = None):
-        """select direct parents. May contain duplicate records!"""
-        children_alias = cls.select(ids, ['parent_id']).alias()
-
-        parents = \
-            select(cls._build_columns(folders_table, columns)). \
-                select_from(
-                folders_table.join(
-                    children_alias,
-                    folders_table.c.id == children_alias.c.parent_id
-                )
-            )
-
-        return parents
+        return cls.direct_parents(ids, cols, group_cols=['id', 'parent_id'])
 
     @classmethod
     def insert_history_from_select(cls, select_q):
@@ -197,11 +187,11 @@ class FolderQuery(QueryBase):
         cols = ['id', 'parent_id', 'size', 'url', imports_table.c.date]
         cols += [literal_column(f"'{ItemType.FILE.value}'", String).label('type')]
 
-        query = select(cls._build_columns(files_table, cols)).\
+        query = select(cls._build_columns(files_table, cols)). \
             select_from(
-                files_table.join(imports_table).
-                join(tree_cte)
-            ).union_all(tree_cte.select())
+            files_table.join(imports_table).
+            join(tree_cte)
+        ).union_all(tree_cte.select())
 
         return query
 
@@ -224,16 +214,17 @@ class ImportQuery:
         return imports_table.insert().values({'date': date}).returning(imports_table.c.id)
 
     def recursive_parents_with_size(self, add: bool = True):
+        # todo: does it make sense to grouping direct parents?
         direct_parents = \
             FileQuery.direct_parents_with_size(self.file_ids, add). \
-                union_all(FolderQuery.direct_parents_with_size(self.folder_ids, add)).alias()
+            union_all(FolderQuery.direct_parents_with_size(self.folder_ids, add)).alias()
 
-        parents_cte = select([
-            direct_parents.c.id,
-            direct_parents.c.parent_id,
-            func.sum(direct_parents.c.size).label('size')
-        ]). \
-            select_from(direct_parents). \
+        parents_cte = \
+            select([
+                direct_parents.c.id,
+                direct_parents.c.parent_id,
+                func.sum(direct_parents.c.size).label('size')
+            ]). \
             group_by(direct_parents.c.id, direct_parents.c.parent_id).cte(recursive=True)
 
         folders_alias = folders_table.alias()
@@ -258,8 +249,8 @@ class ImportQuery:
                 [parents_recursive.c.id,
                  func.sum(parents_recursive.c.size).label('size')]
             ). \
-                select_from(parents_recursive). \
-                group_by(parents_recursive.c.id)
+            select_from(parents_recursive). \
+            group_by(parents_recursive.c.id)
 
         return all_parents
 
