@@ -31,7 +31,7 @@ imports_table = Table(
     'imports',
     metadata,
     Column('id', Integer, primary_key=True),
-    Column('date', DateTime(timezone=True), nullable=False)
+    Column('date', DateTime(timezone=True), nullable=False, index=True)
 )
 
 folders_table = Table(

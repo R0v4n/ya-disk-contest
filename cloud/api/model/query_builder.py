@@ -133,7 +133,6 @@ class QueryBase(ABC, CommonQueryMixin):
                                  ids: Iterable[str] | str = None, closed=True):
         q = cls.select_nodes_union_history_in_daterange(date_start, date_end, ids, closed).cte()
 
-        # todo: refactor max(import_id)? after adding import_date validation or add indexing on import_date
         q2 = select([q.c.id, func.max(q.c.date).label('date')]).group_by(q.c.id).alias()
 
         q3 = select(q.columns).select_from(q.join(q2, (q.c.id == q2.c.id) & (q.c.date == q2.c.date))).distinct()
