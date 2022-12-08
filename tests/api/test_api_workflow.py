@@ -13,7 +13,7 @@ async def test(api_client, sync_connection):
 
     await post_import(api_client, import_data)
 
-    n = 100
+    n = 50
     check_count = n
     check_step = n // check_count
 

@@ -7,53 +7,55 @@ from asyncpgsa import PG
 from .base_model import BaseImportModel
 from .data_classes import ItemType, ExportItem
 from .node_tree import ExportNodeTree
-from .query_builder import FileQuery, FolderQuery
+from .query_builder import FileQuery, FolderQuery, Sign, QueryT
 
 
 class NodeModel(BaseImportModel):
+
     def __init__(self, node_id: str, pg: PG, date: datetime | None = None):
 
         super().__init__(pg, date)
         self.node_id = node_id
+        self._query = None
+        self._node_type = None
 
-    async def _get_node_type(self, conn) -> ItemType:
-        for q, t in zip([FileQuery, FolderQuery], ItemType):
-            node_exists = await conn.fetchval(q.exist(self.node_id))
+    @property
+    def query(self) -> type[QueryT]:
+        return self._query
+
+    @property
+    def node_type(self) -> ItemType:
+        return self._node_type
+
+    async def init(self, conn):
+        for self._query, self._node_type in zip([FileQuery, FolderQuery], ItemType):
+            node_exists = await conn.fetchval(self._query.exist(self.node_id))
 
             if node_exists:
-                return t
+                return
 
         raise HTTPNotFound()
 
     async def get_node(self) -> dict[str, Any]:
-        if await self._get_node_type(self.pg) == ItemType.FILE:
-            query = FileQuery.select_node_with_date(self.node_id, ['id', 'parent_id', 'url', 'size'])
-            res = [await self.pg.fetchrow(query)]
-        else:
-            res = await self.pg.fetch(FolderQuery.select_folder_tree(self.node_id))
-
+        res = await self.pg.fetch(self.query.get_node_select_query(self.node_id))
         # In general from_records returns a list[NodeTree]. In this case it will always be a single NodeTree list.
         tree = ExportNodeTree.from_records(res)[0]
-
         return tree.dict(by_alias=True)
 
     async def _delete_node(self):
-
-        if await self._get_node_type(self.conn) == ItemType.FILE:
-            query_class, file_id, folder_id = FileQuery, self.node_id, []
-        else:
-            query_class, file_id, folder_id = FolderQuery, [], self.node_id
-
         await self.insert_import()
 
-        parents = query_class.recursive_parents(self.node_id)
+        parents = self.query.recursive_parents(self.node_id)
         history_q = FolderQuery.insert_history_from_select(parents)
 
-        update_q = FolderQuery.update_parent_sizes(file_id, folder_id, self.import_id, add=False)
+        file_id = self.node_id if self.node_type == ItemType.FILE else []
+        folder_id = self.node_id if self.node_type == ItemType.FOLDER else []
+        # todo: refactor recursive parents with sizes. param direct_parents select probably.
+        update_q = FolderQuery.update_parent_sizes(file_id, folder_id, self.import_id, Sign.SUB)
 
         await self.conn.execute(history_q)
         await self.conn.execute(update_q)
-        await self.conn.execute(query_class.delete(self.node_id))
+        await self.conn.execute(self.query.delete(self.node_id))
 
     async def execute_del_node(self):
         await self.execute_in_transaction(self._delete_node)
@@ -63,16 +65,9 @@ class NodeModel(BaseImportModel):
         if date_start >= date_end or date_end.tzinfo is None or date_start.tzinfo is None:
             raise HTTPBadRequest
 
-        # todo: dry!
-        node_type = await self._get_node_type(self.pg)
-        query_class = {
-            ItemType.FILE: FileQuery,
-            ItemType.FOLDER: FolderQuery
-        }[node_type]
-
-        query = query_class.select_nodes_union_history_in_daterange(date_start, date_end, self.node_id, closed=False)
+        query = self.query.select_nodes_union_history_in_daterange(date_start, date_end, self.node_id, closed=False)
 
         res = await self.pg.fetch(query)
-        nodes = [ExportItem(type=node_type, **rec).dict(by_alias=True) for rec in res]
+        nodes = [ExportItem(type=self.node_type, **rec).dict(by_alias=True) for rec in res]
 
         return nodes

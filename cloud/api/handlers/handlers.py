@@ -61,7 +61,9 @@ class NodeView(BasePydanticView):
             400: Невалидная схема документа или входные данные не верны.
             404: Элемент не найден.
         """
-        node = await NodeModel(node_id, self.pg).get_node()
+        mdl = NodeModel(node_id, self.pg)
+        await mdl.init(self.pg)
+        node = await mdl.get_node()
         return json_response(node, dumps=dumps)
 
 
@@ -83,7 +85,9 @@ class DeleteNodeView(BasePydanticView):
             400: Невалидная схема документа или входные данные не верны.
             404: Элемент не найден.
         """
-        await self.ModelT(node_id, self.pg, date).execute_del_node()
+        mdl = self.ModelT(node_id, self.pg, date)
+        await mdl.init(self.pg)
+        await mdl.execute_del_node()
         return Response()
 
 
@@ -125,6 +129,7 @@ class NodeHistoryView(BasePydanticView):
             404: Элемент не найден.
         """
         mdl = NodeModel(node_id, self.pg)
+        await mdl.init(self.pg)
         nodes = await mdl.get_node_history(dateStart, dateEnd)
 
         return json_response({'items': nodes}, dumps=dumps)

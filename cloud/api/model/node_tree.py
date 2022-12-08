@@ -22,9 +22,7 @@ class TreeMixin(ABC):
 
     @classmethod
     def from_records(cls, records: Iterable[Mapping[str, Any]]) -> list['Self']:
-
         nodes = (cls(**rec) for rec in records)
-
         return cls.from_nodes(nodes)
 
     @classmethod

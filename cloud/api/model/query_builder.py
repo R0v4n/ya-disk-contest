@@ -1,12 +1,18 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Iterable, Any
+from enum import IntEnum
+from typing import Iterable, Any, TypeVar
 
 from sqlalchemy import Table, select, func, exists, literal_column, String, union_all
 from sqlalchemy.sql.elements import Null
 
 from cloud.db.schema import files_table, folder_history, folders_table, file_history, imports_table
 from .data_classes import ItemType
+
+
+class Sign(IntEnum):
+    ADD = 1
+    SUB = -1
 
 
 def insert_import_query(date: datetime):
@@ -53,7 +59,7 @@ class QueryBase(ABC, QueryToolsMixin):
     @classmethod
     def select_node_with_date(cls, node_id: str, columns: list[str | None] | None = None):
         """
-        Select node record with additional fields type and date (instead of import_id).
+        Select node record with additional fields type and date.
         Used for get_node api method.
         """
         columns += [literal_column(f"'{cls.node_type.value}'", String).label('type')]
@@ -143,6 +149,14 @@ class QueryBase(ABC, QueryToolsMixin):
         q3 = select(q.columns).select_from(q.join(q2, (q.c.id == q2.c.id) & (q.c.date == q2.c.date))).distinct()
         return q3
 
+    @classmethod
+    @abstractmethod
+    def get_node_select_query(cls, node_id: str):
+        """:return: select query for get node API method"""
+
+
+QueryT = TypeVar('QueryT', bound=QueryBase)
+
 
 class FolderQuery(QueryBase):
     """Functor class for folder_table queries"""
@@ -189,14 +203,17 @@ class FolderQuery(QueryBase):
         return query
 
     @classmethod
-    def recursive_parents_with_size(cls, file_ids, folder_ids, add: bool = True):
+    def get_node_select_query(cls, node_id: str):
+        return cls.select_folder_tree(node_id)
+
+    @classmethod
+    def recursive_parents_with_size(cls, file_ids: Iterable[str] | None,
+                                    folder_ids: Iterable[str] | None, sign: Sign = Sign.ADD):
 
         direct_parents = union_all(
             FileQuery.direct_parents(file_ids, ['id', 'parent_id', files_table.c.size]),
             cls.direct_parents(folder_ids, ['id', 'parent_id', folders_table.c.size])
         ).alias()
-
-        sign = 1 if add else -1
 
         parents_cte = \
             select([
@@ -210,7 +227,7 @@ class FolderQuery(QueryBase):
         parents_alias = parents_cte.alias()
 
         join_condition = (folders_alias.c.id == parents_alias.c.parent_id)
-        if not add:
+        if sign == Sign.SUB:
             # if two nodes (one child of another) was moved from one branch.
             join_condition &= ~ parents_alias.c.id.in_(folder_ids)
 
@@ -239,9 +256,9 @@ class FolderQuery(QueryBase):
             file_ids: Iterable[str] | str,
             folder_ids: Iterable[str] | str,
             import_id: int,
-            add: bool = True):
+            sign: Sign = Sign.ADD):
 
-        select_q = cls.recursive_parents_with_size(file_ids, folder_ids, add).alias()
+        select_q = cls.recursive_parents_with_size(file_ids, folder_ids, sign).alias()
 
         query = folders_table.update().where(folders_table.c.id == select_q.c.id).values(
             size=select_q.c.size + folders_table.c.size, import_id=import_id)
@@ -256,4 +273,6 @@ class FileQuery(QueryBase):
     history_table = file_history
     node_type = ItemType.FILE
 
-
+    @classmethod
+    def get_node_select_query(cls, node_id: str):
+        return cls.select_node_with_date(node_id, ['id', 'parent_id', 'url', 'size'])
