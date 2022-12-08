@@ -30,7 +30,6 @@ class NodeModel(BaseImportModel):
             query = FileQuery.select_node_with_date(self.node_id, ['id', 'parent_id', 'url', 'size'])
             res = [await self.pg.fetchrow(query)]
         else:
-            # res = await self.pg.fetch(FolderQuery.child_folders(self.node_id))
             res = await self.pg.fetch(FolderQuery.select_folder_tree(self.node_id))
 
         # In general from_records returns a list[NodeTree]. In this case it will always be a single NodeTree list.

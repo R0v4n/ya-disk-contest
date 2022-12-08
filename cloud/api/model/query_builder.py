@@ -13,10 +13,10 @@ def insert_import_query(date: datetime):
     return imports_table.insert().values({'date': date}).returning(imports_table.c.id)
 
 
-class CommonQueryMixin:
+class QueryToolsMixin:
 
     @staticmethod
-    def _build_columns(table: Table, columns: list[str | None] | None = None):
+    def _build_columns(table: Table, columns: Iterable[str | Any] | None = None):
 
         if columns is None:
             return table.columns
@@ -37,17 +37,8 @@ class CommonQueryMixin:
 
         return table.c.id.in_(ids)
 
-    @classmethod
-    def select_join_date(cls, table: Table, condition=None, columns: list[str | None] | None = None):
-        query = select(cls._build_columns(table, columns) + [imports_table.c.date]). \
-            select_from(table.join(imports_table))
-        if condition is not None:
-            query = query.where(condition)
 
-        return query
-
-
-class QueryBase(ABC, CommonQueryMixin):
+class QueryBase(ABC, QueryToolsMixin):
     """Base functor class for queries"""
 
     table: Table
@@ -61,22 +52,30 @@ class QueryBase(ABC, CommonQueryMixin):
 
     @classmethod
     def select_node_with_date(cls, node_id: str, columns: list[str | None] | None = None):
+        """
+        Select node record with additional fields type and date (instead of import_id).
+        Used for get_node api method.
+        """
         columns += [literal_column(f"'{cls.node_type.value}'", String).label('type')]
-        return cls.select_join_date(cls.table, cls._ids_condition(cls.table, node_id), columns)
+
+        return select(cls._build_columns(cls.table, columns) + [imports_table.c.date]). \
+            select_from(cls.table.join(imports_table)). \
+            where(cls.table.c.id == node_id)
 
     @classmethod
     def insert(cls, values: list[dict[str, Any]]):
         return cls.table.insert().values(values)
 
-    # note: this is not used. check import_model
     @classmethod
-    def update(cls, bind_params):
-        return cls.table.update(). \
-            where(cls.table.c.id == bind_params.pop('id')). \
-            values(**bind_params)
+    def update_many(cls, mapping: dict[str, str]):
+        id_param = mapping.pop('id')
+
+        cols = ', '.join(f'{key}={val}' for key, val in mapping.items())
+
+        return f'UPDATE {cls.table.name} SET {cols} WHERE id = {id_param}'
 
     @classmethod
-    def direct_parents(cls, ids, columns: list[str | None] | None = None):
+    def direct_parents(cls, ids: Iterable[str] | str, columns: list[str | None] | None = None):
         """select direct parents. May contain duplicate records!"""
 
         folders_alias = folders_table.alias()
@@ -130,9 +129,9 @@ class QueryBase(ABC, CommonQueryMixin):
         if ids:
             condition &= cls._ids_condition(union_cte, ids)
 
-        query = cls.select_join_date(union_cte, condition, cols)
-
-        return query
+        return select(cls._build_columns(union_cte, cols) + [imports_table.c.date]). \
+            select_from(union_cte.join(imports_table)). \
+            where(condition)
 
     @classmethod
     def select_updates_daterange(cls, date_start: datetime, date_end: datetime,
@@ -175,7 +174,7 @@ class FolderQuery(QueryBase):
         return cte
 
     @classmethod
-    def select_folder_tree(cls, folder_id):
+    def select_folder_tree(cls, folder_id: str):
         tree_cte = cls.folder_tree_cte(folder_id)
 
         cols = ['id', 'parent_id', 'size', 'url', imports_table.c.date]
