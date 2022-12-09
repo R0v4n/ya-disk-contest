@@ -4,7 +4,6 @@ from typing import Iterable, Any
 
 from aiohttp.web_exceptions import HTTPBadRequest
 from asyncpg import ForeignKeyViolationError
-from asyncpgsa import PG
 from asyncpgsa.connection import SAConnection
 
 from .base_model import BaseImportModel
@@ -15,17 +14,20 @@ from .query_builder import FileQuery, FolderQuery, QueryT, Sign
 
 # todo: add slots to models. check private methods everywhere
 class ImportModel(BaseImportModel):
-    """Wraps FolderListModel and FileListModel interfaces in a single execute_post_import method call"""
+    """Wraps FolderListModel and FileListModel interfaces in calls to init and execute_post_import methods"""
 
-    def __init__(self, data: ImportData, pg: PG):
+    __slots__ = ('data', 'files_mdl', 'folders_mdl')
+
+    def __init__(self, data: ImportData):
 
         self.data = data
-        super().__init__(pg, data.date)
+        super().__init__(data.date)
 
         self.files_mdl: FileListModel | None = None
         self.folders_mdl: FolderListModel | None = None
 
-    async def init(self):
+    async def init(self, connection):
+        await super().init(connection)
         await self.insert_import()
 
         self.folders_mdl = FolderListModel(self.data, self.import_id, self.conn)
@@ -64,8 +66,7 @@ class ImportModel(BaseImportModel):
 
         await self.folders_mdl.write_history(ids_set)
 
-    async def _execute(self):
-        await self.init()
+    async def execute_post_import(self):
         await self.write_folders_history()
         # write files history
         await self.files_mdl.write_history(self.files_mdl.existent_ids)
@@ -87,38 +88,13 @@ class ImportModel(BaseImportModel):
             self.folders_mdl.ids
         )
 
-    async def execute_post_import(self):
-        await self.execute_in_transaction(self._execute)
-        # await self.execute_in_transaction(
-        #     self.init,
-        #     self.write_folders_history,
-        #     # write files history
-        #     partial(self.files_mdl.write_history, self.files_mdl.existent_ids),
-        #     # subtract  parent sizes
-        #     partial(
-        #         self.folders_mdl.update_parent_sizes,
-        #         self.files_mdl.existent_ids,
-        #         self.folders_mdl.existent_ids,
-        #         Sign.SUB
-        #     ),
-        #     # insert new nodes
-        #     self.folders_mdl.insert_new,
-        #     self.files_mdl.insert_new,
-        #     # update existent nodes
-        #     self.folders_mdl.update_existent,
-        #     self.files_mdl.update_existent,
-        #     # add parent sizes
-        #     partial(
-        #         self.folders_mdl.update_parent_sizes,
-        #         self.files_mdl.ids,
-        #         self.folders_mdl.ids
-        #     )
-        # )
-
 
 class NodeListBaseModel(ABC):
     NodeT: ItemType
     Query: type[QueryT]
+
+    __slots__ = ('import_id', 'conn', 'date', 'nodes', 'ids',
+                 '_new_ids', '_existent_ids', '_existent_parent_ids')
 
     def __init__(self, data: ImportData, import_id: int,
                  conn: SAConnection):
@@ -189,12 +165,14 @@ class NodeListBaseModel(ABC):
 
     @abstractmethod
     async def write_history(self, ids: Iterable[str]):
-        """write records with id in ids to history table"""
+        """write records from node table to history table"""
 
 
 class FileListModel(NodeListBaseModel):
     NodeT = ItemType.FILE
     Query = FileQuery
+
+    __slots__ = ()
 
     def _get_new_nodes_records(self):
         return [
@@ -214,6 +192,8 @@ class FileListModel(NodeListBaseModel):
 class FolderListModel(NodeListBaseModel):
     NodeT = ItemType.FOLDER
     Query = FolderQuery
+
+    __slots__ = ()
 
     def _get_new_nodes_records(self):
         new_folders = (node for node in self.nodes if node.id in self.new_ids)

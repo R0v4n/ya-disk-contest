@@ -2,7 +2,6 @@ from datetime import datetime
 from typing import Any
 
 from aiohttp.web_exceptions import HTTPNotFound, HTTPBadRequest
-from asyncpgsa import PG
 
 from .base_model import BaseImportModel
 from .data_classes import ItemType, ExportItem
@@ -12,9 +11,11 @@ from .query_builder import FileQuery, FolderQuery, Sign, QueryT
 
 class NodeModel(BaseImportModel):
 
-    def __init__(self, node_id: str, pg: PG, date: datetime | None = None):
+    __slots__ = ('node_id', '_query', '_node_type')
 
-        super().__init__(pg, date)
+    def __init__(self, node_id: str, date: datetime | None = None):
+
+        super().__init__(date)
         self.node_id = node_id
         self._query = None
         self._node_type = None
@@ -27,9 +28,10 @@ class NodeModel(BaseImportModel):
     def node_type(self) -> ItemType:
         return self._node_type
 
-    async def init(self, conn):
+    async def init(self, connection):
+        await super().init(connection)
         for self._query, self._node_type in zip([FileQuery, FolderQuery], ItemType):
-            node_exists = await conn.fetchval(self._query.exist(self.node_id))
+            node_exists = await self.conn.fetchval(self._query.exist(self.node_id))
 
             if node_exists:
                 return
@@ -37,12 +39,12 @@ class NodeModel(BaseImportModel):
         raise HTTPNotFound()
 
     async def get_node(self) -> dict[str, Any]:
-        res = await self.pg.fetch(self.query.get_node_select_query(self.node_id))
+        res = await self.conn.fetch(self.query.get_node_select_query(self.node_id))
         # In general from_records returns a list[NodeTree]. In this case it will always be a single NodeTree list.
         tree = ExportNodeTree.from_records(res)[0]
         return tree.dict(by_alias=True)
 
-    async def _delete_node(self):
+    async def execute_delete_node(self):
         await self.insert_import()
 
         parents = self.query.recursive_parents(self.node_id)
@@ -57,9 +59,6 @@ class NodeModel(BaseImportModel):
         await self.conn.execute(update_q)
         await self.conn.execute(self.query.delete(self.node_id))
 
-    async def execute_del_node(self):
-        await self.execute_in_transaction(self._delete_node)
-
     async def get_node_history(self, date_start: datetime, date_end: datetime) -> list[dict[str, Any]]:
 
         if date_start >= date_end or date_end.tzinfo is None or date_start.tzinfo is None:
@@ -67,7 +66,7 @@ class NodeModel(BaseImportModel):
 
         query = self.query.select_nodes_union_history_in_daterange(date_start, date_end, self.node_id, closed=False)
 
-        res = await self.pg.fetch(query)
+        res = await self.conn.fetch(query)
         nodes = [ExportItem(type=self.node_type, **rec).dict(by_alias=True) for rec in res]
 
         return nodes

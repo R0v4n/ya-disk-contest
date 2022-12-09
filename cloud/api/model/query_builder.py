@@ -45,7 +45,7 @@ class QueryToolsMixin:
 
 
 class QueryBase(ABC, QueryToolsMixin):
-    """Base functor class for queries"""
+    """Base class for queries"""
 
     table: Table
     history_table: Table
@@ -159,7 +159,7 @@ QueryT = TypeVar('QueryT', bound=QueryBase)
 
 
 class FolderQuery(QueryBase):
-    """Functor class for folder_table queries"""
+    """Class for folder_table queries"""
 
     table = folders_table
     history_table = folder_history
@@ -267,7 +267,7 @@ class FolderQuery(QueryBase):
 
 
 class FileQuery(QueryBase):
-    """Functor class for file_table queries"""
+    """Class for file_table queries"""
 
     table = files_table
     history_table = file_history
