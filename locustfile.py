@@ -4,10 +4,12 @@ from http import HTTPStatus
 from random import choice, randint, uniform
 
 from locust import HttpUser, task
-# from locust.exception import RescheduleTask
 
-from cloud.utils.testing import FakeCloudGen, url_for
 from cloud.api.handlers import ImportsView, DeleteNodeView, NodeView, UpdatesView, NodeHistoryView
+from cloud.utils.testing import FakeCloudGen, url_for
+
+
+# from locust.exception import RescheduleTask
 
 
 class User(HttpUser):
@@ -65,17 +67,24 @@ class User(HttpUser):
             path = url_for(DeleteNodeView.URL_PATH, {'node_id': node_id}, {'date': date})
             self.request('DELETE', path, name='del_node')
 
-    @task(20)
-    def get_node(self, node_id: str = None):
-        # todo: get only folders
+    def get_node(self, node_id: str = None, ids: list[str] | tuple[str] = None, **req_kwargs):
         if node_id is None:
-            ids = self.cloud.ids
+            if ids is None:
+                ids = self.cloud.ids
             if ids:
-                node_id = choice(self.cloud.ids)
+                node_id = choice(ids)
 
         if node_id:
             path = url_for(NodeView.URL_PATH, {'node_id': node_id})
-            self.request('GET', path, name='get_node')
+            self.request('GET', path, **req_kwargs)
+
+    @task(18)
+    def get_folder(self, folder_id: str = None):
+        self.get_node(folder_id, self.cloud.folder_ids, name='get_folder')
+
+    @task(2)
+    def get_file(self, file_id: str = None):
+        self.get_node(file_id, self.cloud.file_ids, name='get_file')
 
     @task(20)
     def get_node_history(self):

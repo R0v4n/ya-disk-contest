@@ -204,6 +204,7 @@ class FolderListModel(NodeListBaseModel):
         return ordered_folders
 
     async def write_history(self, ids: Iterable[str]):
+        """write  folder table records with given ids and all their recursive parents to history table"""
         if ids:
             folders_select = self.Query.select(ids)
             parents = self.Query.recursive_parents(ids)
@@ -211,12 +212,13 @@ class FolderListModel(NodeListBaseModel):
 
             await self.conn.execute(insert_hist)
 
-    async def update_parent_sizes(self, file_ids: Iterable[str], folder_ids: Iterable[str], sign: Sign = Sign.ADD):
-        if file_ids or folder_ids:
+    async def update_parent_sizes(self, child_files_ids: Iterable[str],
+                                  child_folders_ids: Iterable[str], sign: Sign = Sign.ADD):
+        if child_files_ids or child_folders_ids:
             await self.conn.execute(
                 self.Query.update_parent_sizes(
-                    file_ids,
-                    folder_ids,
+                    child_files_ids,
+                    child_folders_ids,
                     self.import_id,
                     sign
                 )

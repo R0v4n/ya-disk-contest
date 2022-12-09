@@ -165,6 +165,7 @@ class Import(pdt.BaseModel):
 # todo: write tests for it!
 class FakeCloud:
     faker = fake
+    __slots__ = ('_root', '_items', '_imports', '_history', '_folder_ids')
 
     def __init__(self):
 
@@ -434,6 +435,14 @@ class FakeCloud:
         return tuple(self._items.keys() - {None})
 
     @property
+    def folder_ids(self):
+        return tuple(self._folder_ids - {None})
+
+    @property
+    def file_ids(self):
+        return tuple(self._items.keys() - self._folder_ids)
+
+    @property
     def last_import_date(self):
         if not self._imports:
             return None
@@ -545,6 +554,8 @@ default_schema_gen = partial(random_schema, max_files_in_one_folder=5, max_depth
 
 
 class FakeCloudGen(FakeCloud):
+
+    __slots__ = ('_write_history',)
 
     def __init__(self, write_history=True):
 
