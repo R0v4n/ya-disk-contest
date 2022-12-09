@@ -50,9 +50,7 @@ class NodeModel(BaseImportModel):
         parents = self.query.recursive_parents(self.node_id)
         history_q = FolderQuery.insert_history_from_select(parents)
 
-        file_id = self.node_id if self.node_type == ItemType.FILE else []
-        folder_id = self.node_id if self.node_type == ItemType.FOLDER else []
-        # todo: refactor recursive parents with sizes. param direct_parents select probably.
+        file_id, folder_id = (self.node_id, None) if self.node_type == ItemType.FILE else (None, self.node_id)
         update_q = FolderQuery.update_parent_sizes(file_id, folder_id, self.import_id, Sign.SUB)
 
         await self.conn.execute(history_q)

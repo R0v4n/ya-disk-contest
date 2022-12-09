@@ -9,6 +9,8 @@ from .query_builder import FileQuery
 
 class HistoryModel:
 
+    __slots__ = ('conn', 'date_end')
+
     def __init__(self, pg: PG, date_end: datetime):
 
         self.conn = pg
@@ -21,7 +23,6 @@ class HistoryModel:
 
         res = await self.conn.fetch(query)
 
-        # todo: do i really need using ExportItem here? performance?
-        #  json payloads?
-        nodes = [ExportItem(type=ItemType.FILE, **rec).dict(by_alias=True) for rec in res]
+        # todo: json payloads?
+        nodes = [ExportItem.construct(type=ItemType.FILE, **rec).dict(by_alias=True) for rec in res]
         return nodes

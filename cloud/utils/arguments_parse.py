@@ -18,5 +18,4 @@ positive_int = validate(int, constrain=lambda x: x > 0)
 
 def clear_environ(rule: Callable[[str], bool]):
     for name in filter(rule, tuple(os.environ)):
-        # todo: i added CLOUD_API_ADDRESS and run app. Var hasn't been deleted.
         os.environ.pop(name)

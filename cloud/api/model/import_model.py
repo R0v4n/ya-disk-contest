@@ -12,7 +12,6 @@ from .node_tree import ImportNodeTree
 from .query_builder import FileQuery, FolderQuery, QueryT, Sign
 
 
-# todo: add slots to models. check private methods everywhere
 class ImportModel(BaseImportModel):
     """Wraps FolderListModel and FileListModel interfaces in calls to init and execute_post_import methods"""
 

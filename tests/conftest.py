@@ -10,7 +10,7 @@ from cloud.api.settings import default_settings
 from cloud.utils.pg import make_alembic_config
 from cloud.utils.testing import FakeCloud
 
-# fixme: CI?
+
 PG_DSN = os.getenv('CLOUD_PG_DSN', default_settings.pg_dsn)
 
 
@@ -39,8 +39,7 @@ def alembic_config(postgres):
     )
     config = make_alembic_config(cmd_options)
 
-    # fixme: this does not work
-    config.set_section_option("logger_alembic", "level", "ERROR")
+    # config.set_section_option("logger_alembic", "level", "ERROR")
     return config
 
 

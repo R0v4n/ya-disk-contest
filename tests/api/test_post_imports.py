@@ -35,7 +35,7 @@ async def test_with_fake_cloud(api_client, fake_cloud, sync_connection):
     compare_db_fc_state(sync_connection, fake_cloud)
     # ################################################################### #
     # empty folder insertion should update parents
-    # warning: this behavior is my first assumption how api should work. Perhaps this is not correct.
+    # note: this behavior is my first assumption how api should work. It could be incorrect.
     #  Also, if delta size for any parent is equal to zero, it's considered updated anyway.
     fake_cloud.generate_import([], parent_id=d2.id)
 
@@ -107,7 +107,7 @@ def ids(prepare: tuple):
 # ]
 
 
-@pytest.fixture(params=list(range(13)))
+@pytest.fixture(params=list(range(14)))
 def case(request, filled_cloud: FakeCloud, ids):
     fake_cloud = filled_cloud
     folder_id, file_id = ids
@@ -219,6 +219,15 @@ def case(request, filled_cloud: FakeCloud, ids):
 
     res.append((import_dict, HTTPStatus.BAD_REQUEST))
     # ################################################################### #
+    # invalid import data format (extra field in item).
+    folder = Folder().import_dict | {'foo': 'bar'}
+    import_dict = {
+        'items': [folder],
+        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
+    }
+
+    res.append((import_dict, HTTPStatus.BAD_REQUEST))
+    # ################################################################### #
     return res[request.param]
 
 
@@ -231,7 +240,6 @@ async def test_import_cases(
     import_data, expected_status = case
     if expected_status == HTTPStatus.OK:
         fake_cloud.load_import(import_data)
-
     await post_import(api_client, import_data, expected_status=expected_status)
 
     compare_db_fc_state(sync_connection, fake_cloud)

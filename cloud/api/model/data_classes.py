@@ -12,7 +12,6 @@ class ParentIdValidationError(ValueError):
 
 
 class ItemType(Enum):
-    """Тип элемента - папка или файл"""
     FILE = 'FILE'
     FOLDER = 'FOLDER'
 
@@ -33,8 +32,7 @@ class ImportItem(Item):
         FOLDER_DB_FIELDS = {'id', 'parent_id'}
         FILE_DB_FIELDS = {'id', 'parent_id', 'url', 'size'}
 
-        # todo: do i need it?
-        # extra = pdt.Extra.forbid
+        extra = pdt.Extra.forbid
 
     @pdt.root_validator
     def check_fields(cls, values):
@@ -52,7 +50,6 @@ class ImportItem(Item):
         return values
 
     def db_dict(self, import_id: int):
-        # todo: import id can be passed via param in query probably
         return self.dict(include=self.db_fields_set(self.type)) | {'import_id': import_id}
 
     @classmethod
@@ -61,7 +58,6 @@ class ImportItem(Item):
 
 
 class ExportItem(Item):
-    # todo: think about validation
     date: datetime
     size: pdt.conint(ge=0)
 
@@ -81,7 +77,6 @@ class ImportData(pdt.BaseModel):
         return items
 
 
-# todo: how to use it?
 class Error(pdt.BaseModel):
     code: int
     message: str

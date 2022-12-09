@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import IntEnum
 from typing import Iterable, Any, TypeVar
 
-from sqlalchemy import Table, select, func, exists, literal_column, String, union_all
+from sqlalchemy import Table, select, func, exists, literal_column, String
 from sqlalchemy.sql.elements import Null
 
 from cloud.db.schema import files_table, folder_history, folders_table, file_history, imports_table
@@ -30,7 +30,7 @@ class QueryToolsMixin:
             return [table.c[name] if isinstance(name, str) else name for name in columns]
 
     @staticmethod
-    def _ids_condition(table: Table, ids: list[str] | set[str] | str):
+    def _ids_condition(table: Table, ids: Iterable[str] | str):
         if type(ids) == str:
             return table.c.id == ids
 
@@ -207,13 +207,23 @@ class FolderQuery(QueryBase):
         return cls.select_folder_tree(node_id)
 
     @classmethod
-    def recursive_parents_with_size(cls, file_ids: Iterable[str] | None,
-                                    folder_ids: Iterable[str] | None, sign: Sign = Sign.ADD):
+    def recursive_parents_with_size(cls, file_ids: Iterable[str] | str | None,
+                                    folder_ids: Iterable[str] | str | None, sign: Sign = Sign.ADD):
+        if file_ids:
+            direct_parents = FileQuery.direct_parents(file_ids, ['id', 'parent_id', files_table.c.size])
 
-        direct_parents = union_all(
-            FileQuery.direct_parents(file_ids, ['id', 'parent_id', files_table.c.size]),
-            cls.direct_parents(folder_ids, ['id', 'parent_id', folders_table.c.size])
-        ).alias()
+            if folder_ids:
+                direct_parents = direct_parents.union_all(
+                    cls.direct_parents(folder_ids, ['id', 'parent_id', folders_table.c.size])
+                )
+
+        elif folder_ids:
+            direct_parents = cls.direct_parents(folder_ids, ['id', 'parent_id', folders_table.c.size])
+
+        else:
+            raise ValueError('file_ids or folder_ids should exists')
+
+        direct_parents = direct_parents.alias()
 
         parents_cte = \
             select([
@@ -227,9 +237,9 @@ class FolderQuery(QueryBase):
         parents_alias = parents_cte.alias()
 
         join_condition = (folders_alias.c.id == parents_alias.c.parent_id)
-        if sign == Sign.SUB:
+        if sign == Sign.SUB and folder_ids:
             # if two nodes (one child of another) was moved from one branch.
-            join_condition &= ~ parents_alias.c.id.in_(folder_ids)
+            join_condition &= ~ cls._ids_condition(parents_alias, folder_ids)
 
         parents_recursive = parents_cte.union_all(
             select([
@@ -253,8 +263,8 @@ class FolderQuery(QueryBase):
     @classmethod
     def update_parent_sizes(
             cls,
-            file_ids: Iterable[str] | str,
-            folder_ids: Iterable[str] | str,
+            file_ids: Iterable[str] | str | None,
+            folder_ids: Iterable[str] | str | None,
             import_id: int,
             sign: Sign = Sign.ADD):
 

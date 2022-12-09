@@ -107,6 +107,4 @@ async def test_node_history(api_client, cloud, date_range, id_):
     expected_history = cloud.get_node_history(id_, date_start, date_end)
     received_history = await get_node_history(api_client, id_, date_start, date_end)
 
-    debug(received_history)
-
     assert DeepDiff(expected_history, received_history, ignore_order=True) == {}
