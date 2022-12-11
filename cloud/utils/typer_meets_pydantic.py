@@ -42,7 +42,6 @@ class SettingsBase(BaseModel):
             return str
 
 
-# todo: fix usage message
 def typer_entry_point(cli_options: SettingsBase):
     """
     Convert a function in typer entry point.

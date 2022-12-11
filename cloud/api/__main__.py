@@ -16,12 +16,12 @@ from cloud.api.settings import default_settings, Settings
 
 # todo:
 #  -think about to change ids from string to int or uuid.
-#  -need to handle concurrent imports order somehow. queue is doing the job, but it is bad solution.
+#  -handle concurrent imports order somehow. queue is doing the job, but it is bad solution.
 #  -probably refactor to v 0.1.1 with more realistic imports and blocking only one folder branch in db.
 #  -Also in this case refactor history for folder
-#  - bind socket? forklib?
-#  - how to wait until db is ready?
+#  -how to wait until db is ready?
 #  -run migrations from container
+#  -test faster json dump and load, uvloop
 
 
 @typer_entry_point(default_settings)

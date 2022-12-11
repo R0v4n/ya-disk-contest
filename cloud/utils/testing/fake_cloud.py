@@ -233,7 +233,7 @@ class FakeCloud:
         return self._imports[-1].id
 
     def load_import(self, import_data: dict):
-        # warning: there are no check for folder order in import and item validation on insert and update.
+        # note: there are no check for folder order in import and item validation on insert and update.
         date = import_data['updateDate']
         import_id = self._add_new_import_obj(date)
         items = import_data['items']
@@ -306,7 +306,7 @@ class FakeCloud:
 
         self._pop_from_children(item)
 
-        # warning: O(N)
+        # note: O(N)
         for i in range(len(self._history) - 1, -1, -1):
             if self._history[i].id in deleted_ids:
                 self._history.pop(i)
@@ -467,7 +467,7 @@ class FakeCloud:
     def _add_new_import_obj(self, date: datetime | None):
         if date is None:
             date = datetime.now(timezone.utc)
-            # warning: this can be an issue in some cases
+            # note: this can be an issue in some cases
             #  (e.g. some datetime.now added manually, after generating future datetime)
             if self._imports and self._imports[-1].date >= date:
                 date = self._imports[-1].date + timedelta(seconds=1)

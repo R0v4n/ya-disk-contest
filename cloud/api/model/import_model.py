@@ -158,7 +158,7 @@ class NodeListBaseModel(ABC):
 
             try:
                 await self.conn.executemany(self.Query.update_many(mapping), rows)
-            # fixme: this can be a problem if FK error will be raised due to node id.
+            # note: this can be a problem if FK error will be raised due to node id.
             except ForeignKeyViolationError as err:
                 raise ParentIdValidationError(err.detail or '')
 

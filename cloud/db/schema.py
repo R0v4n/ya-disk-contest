@@ -3,7 +3,6 @@ from sqlalchemy import (
     Integer, BigInteger, String, Table, MetaData
 )
 
-# todo: read about
 convention = {
     'all_column_names': lambda constraint, table: '_'.join([
         column.name for column in constraint.columns.values()
