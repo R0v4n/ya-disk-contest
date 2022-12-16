@@ -4,7 +4,7 @@ import pytest
 from deepdiff import DeepDiff
 
 from cloud.utils.testing import get_node, File, import_dataset, compare_db_fc_node_trees
-from tests.api.datasets import datasets_for_get_node
+from tests.conftest import datasets_for_get_node
 
 datasets = datasets_for_get_node()
 

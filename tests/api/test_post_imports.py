@@ -2,244 +2,227 @@ from datetime import timedelta
 from http import HTTPStatus
 
 import pytest
-from deepdiff import DeepDiff
+from pytest_cases import parametrize, fixture, AUTO
 
-from cloud.utils.testing import post_import, FakeCloud, compare_db_fc_state, Folder, get_node, File
-from tests.api.datasets import dataset_for_post_import
+from cloud.api.model import ItemType
+from cloud.utils.testing import post_import, FakeCloud, compare_db_fc_state, Folder, File
 
 
-# todo: add test with random folders order in one branch
+async def test_with_static_data(api_client, fake_cloud, sync_connection, dataset_for_post_import):
 
-async def test_with_static_data(api_client, fake_cloud, sync_connection):
-    dataset = dataset_for_post_import()
-
-    for batch in dataset.import_dicts:
+    for batch in dataset_for_post_import.import_dicts:
         fake_cloud.load_import(batch)
         await post_import(api_client, batch)
 
         compare_db_fc_state(sync_connection, fake_cloud)
 
-    received_tree = await get_node(api_client, dataset.node_id)
-    assert DeepDiff(received_tree, dataset.expected_tree, ignore_order=True) == {}
 
-
-async def test_with_fake_cloud(api_client, fake_cloud, sync_connection):
-    fake_cloud.generate_import([1, []])
-
-    d1 = fake_cloud.get_node_copy('d1')
-    d2 = fake_cloud.get_node_copy('d1/d1')
-    f1 = fake_cloud.get_node_copy('d1/f1')
-
+@pytest.fixture
+async def filled_cloud(api_client, fake_cloud):
+    fake_cloud.generate_import([1, [1, [1, [1]]]])
     await post_import(api_client, fake_cloud.get_import_dict())
 
-    compare_db_fc_state(sync_connection, fake_cloud)
-    # ################################################################### #
-    # empty folder insertion should update parents
-    # note: this behavior is my first assumption how api should work. It could be incorrect.
-    #  Also, if delta size for any parent is equal to zero, it's considered updated anyway.
-    fake_cloud.generate_import([], parent_id=d2.id)
-
-    d3 = fake_cloud.get_node_copy('d1/d1/d1')
-
-    await post_import(api_client, fake_cloud.get_import_dict())
-    compare_db_fc_state(sync_connection, fake_cloud)
-
-    # ################################################################### #
-    # file moved down in branch
-    fake_cloud.generate_import()
-    fake_cloud.update_item(f1.id, parent_id=d3.id, size=f1.size + 100)
-    await post_import(api_client, fake_cloud.get_import_dict())
-
-    compare_db_fc_state(sync_connection, fake_cloud)
-    # ################################################################### #
+    return fake_cloud
 
 
-async def test_child_and_parent_folder_swap(api_client, fake_cloud, sync_connection):
+@fixture
+def folder1(filled_cloud: FakeCloud):
+    return filled_cloud[0]
+
+
+@fixture
+def folder2(filled_cloud: FakeCloud):
+    return filled_cloud[0, 1]
+
+
+@fixture
+def folder3(filled_cloud: FakeCloud):
+    return filled_cloud[0, 1, 1]
+
+
+@fixture
+def file1(filled_cloud: FakeCloud):
+    return filled_cloud[0, 0]
+
+
+@fixture
+def new_empty_folder5_in_folder2(folder2):
+    return [Folder(parent_id=folder2.id).import_dict]
+
+
+@fixture
+def child_and_parent_folders_swap(folder1, folder2, folder3):
     """
-    update from d1/d2/d3/d4 to d1/d3/(d2, d4). Here d2 is just a name, not number or location.
+    update from d1/d2/d3/d4 to d1/d3/(d2, d4), d - is directory (folder).
     One of sophisticated cases that impossible for regular user to do in one update through standard app GUI
     """
-
-    fake_cloud.generate_import([[1, [1, [1]]]])
-    d1 = fake_cloud.get_node_copy('d1')
-    d2 = fake_cloud.get_node_copy('d1/d1')
-    d3 = fake_cloud.get_node_copy('d1/d1/d1')
-
-    await post_import(api_client, fake_cloud.get_import_dict())
-    # ################################################################### #
-
-    fake_cloud.generate_import()
-    fake_cloud.update_item(d3.id, parent_id=d1.id)
-    fake_cloud.update_item(d2.id, parent_id=d3.id)
-
-    await post_import(api_client, fake_cloud.get_import_dict())
-
-    compare_db_fc_state(sync_connection, fake_cloud)
+    folder3.update(parent_id=folder1.id)
+    folder2.update(parent_id=folder3.id)
+    return [folder3.import_dict, folder2.import_dict]
 
 
-@pytest.fixture
-async def prepare(api_client, fake_cloud):
-    fake_cloud.generate_import([1])
-    await post_import(api_client, fake_cloud.get_import_dict())
-    d1 = fake_cloud.get_node_copy('d1')
-    f1 = fake_cloud.get_node_copy('d1/f1')
-    return fake_cloud, (d1.id, f1.id)
+@fixture
+def file1_moved_in_folder3(folder3, file1):
+    file1.update(parent_id=folder3.id)
+    return [file1.import_dict]
 
 
-@pytest.fixture
-def filled_cloud(prepare: tuple):
-    return prepare[0]
+@fixture
+@parametrize(key=[0, (0, 0)])
+def node(key, filled_cloud: FakeCloud):
+    return filled_cloud[key]
 
 
-@pytest.fixture
-def ids(prepare: tuple):
-    return prepare[1]
+@fixture
+def nodes_updated_with_nonexistent_parent(node):
+    node.update(parent_id='1')
+    return node.import_dict
 
 
-# cases = [
-#     # empty import
-#     ([], HTTPStatus.OK),
-#     ([File(id='1').import_dict, File(id='1').import_dict], HTTPStatus.BAD_REQUEST),
-#     ([Folder(id='1').import_dict, File(id='1').import_dict], HTTPStatus.BAD_REQUEST),
-#     ([Folder(id='1').import_dict, Folder(id='1').import_dict], HTTPStatus.BAD_REQUEST),
-#     ([File(parent_id='1').import_dict], HTTPStatus.BAD_REQUEST),
-#
-# ]
+@fixture
+def nodes_type_updated(node):
+    if node.type == ItemType.FOLDER.value:
+        return File(id=node.id).import_dict
+    else:
+        return Folder(id=node.id).import_dict
 
 
-@pytest.fixture(params=list(range(14)))
-def case(request, filled_cloud: FakeCloud, ids):
-    fake_cloud = filled_cloud
-    folder_id, file_id = ids
+@fixture
+def folder_with_size():
+    d = Folder().import_dict
+    d['size'] = 10
+    return [d]
 
-    # ################################################################### #
-    # empty import
+
+@fixture
+@parametrize(
+    items=[
+        # two files with the same id
+        [File(id='1').import_dict, File(id='1').import_dict],
+        # file with size=0
+        [File.construct(size=0).import_dict],
+        # file with url=None
+        [File.construct(url=None).import_dict],
+        # folder with size
+        folder_with_size,
+        # folder with url
+        [Folder.construct(url='foo').import_dict],
+        # file with nonexistent parent
+        [File(parent_id='1').import_dict],
+        # folder with nonexistent parent
+        [Folder(parent_id='1').import_dict],
+        # update nodes with nonexistent parent
+        nodes_updated_with_nonexistent_parent,
+        # two folders with the same id
+        [Folder(id='1').import_dict, Folder(id='1').import_dict],
+        # file and folder with the same id
+        [Folder(id='1').import_dict, File(id='1').import_dict],
+        # attempt to update nodes type
+        nodes_type_updated,
+        # invalid import data format (items is dict)
+        Folder().import_dict,
+        # invalid import data format (extra field in item).
+        [Folder().import_dict | {'foo': 'bar'}]
+    ],
+    idgen=AUTO
+)
+def bad_request_imports(items, filled_cloud: FakeCloud):
+    date = str(filled_cloud.last_import_date + timedelta(seconds=1))
+
     import_dict = {
-        'items': [],
-        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
+        'items': items,
+        'updateDate': date
     }
+    return import_dict
 
-    res = [(import_dict, HTTPStatus.OK)]
-    # ################################################################### #
-    # attempt to import two files with the same id
-    import_dict = {
-        'items': [File(id='1').import_dict, File(id='1').import_dict],
-        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
-    }
 
-    res.append((import_dict, HTTPStatus.BAD_REQUEST))
-    # ################################################################### #
-    # file with nonexistent parent
-    import_dict = {
-        'items': [File(parent_id='1').import_dict],
-        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
-    }
+@fixture
+def extra_field_import(filled_cloud: FakeCloud):
+    date = str(filled_cloud.last_import_date + timedelta(seconds=1))
 
-    res.append((import_dict, HTTPStatus.BAD_REQUEST))
-    # ################################################################### #
-    # folder with nonexistent parent
-    import_dict = {
-        'items': [Folder(parent_id='1').import_dict],
-        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
-    }
-
-    res.append((import_dict, HTTPStatus.BAD_REQUEST))
-    # ################################################################### #
-    # update folder with nonexistent parent
-    import_dict = {
-        'items': [Folder(id=folder_id, parent_id='1').import_dict],
-        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
-    }
-
-    res.append((import_dict, HTTPStatus.BAD_REQUEST))
-    # ################################################################### #
-    # update file with nonexistent parent
-    import_dict = {
-        'items': [File(id=file_id, parent_id='1').import_dict],
-        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
-    }
-
-    res.append((import_dict, HTTPStatus.BAD_REQUEST))
-    # ################################################################### #
-    # attempt to import two folders with the same id
-    import_dict = {
-        'items': [Folder(id='1').import_dict, Folder(id='1').import_dict],
-        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
-    }
-
-    res.append((import_dict, HTTPStatus.BAD_REQUEST))
-    # ################################################################### #
-    # attempt to import file and folder with the same id
-    import_dict = {
-        'items': [Folder(id='1').import_dict, File(id='1').import_dict],
-        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
-    }
-
-    res.append((import_dict, HTTPStatus.BAD_REQUEST))
-    # ################################################################### #
-    # attempt to update item type folder -> file
-    import_dict = {
-        'items': [File(id=folder_id).import_dict],
-        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
-    }
-
-    res.append((import_dict, HTTPStatus.BAD_REQUEST))
-    # ################################################################### #
-    # attempt to update item type file -> folder
-    import_dict = {
-        'items': [Folder(id=file_id).import_dict],
-        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
-    }
-
-    res.append((import_dict, HTTPStatus.BAD_REQUEST))
-    # ################################################################### #
-    # invalid import data format (extra field).
     import_dict = {
         'foo': 'bar',
         'items': [Folder().import_dict],
-        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
+        'updateDate': date
     }
+    return import_dict
 
-    res.append((import_dict, HTTPStatus.BAD_REQUEST))
-    # ################################################################### #
-    # invalid import data format (items is dict).
-    import_dict = {
-        'items': Folder().import_dict,
-        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
-    }
 
-    res.append((import_dict, HTTPStatus.BAD_REQUEST))
-    # ################################################################### #
-    # invalid import data format (date without tz. Does it mistake by the way?)
-    date = (fake_cloud.last_import_date + timedelta(seconds=1)).replace(tzinfo=None)
+@fixture
+def item_without_tz(filled_cloud: FakeCloud):
+    date = str((filled_cloud.last_import_date + timedelta(seconds=1)).replace(tzinfo=None))
+
     import_dict = {
         'items': [Folder().import_dict],
-        'updateDate': str(date)
+        'updateDate': date
     }
+    return import_dict
 
-    res.append((import_dict, HTTPStatus.BAD_REQUEST))
-    # ################################################################### #
-    # invalid import data format (extra field in item).
-    folder = Folder().import_dict | {'foo': 'bar'}
+
+@fixture
+def reversed_items_import_data(filled_cloud: FakeCloud):
+    p_id = filled_cloud[0].id
+    filled_cloud.generate_import([[2, [[[]]]], 1, [1, []]], parent_id=p_id)
+    import_data = filled_cloud.get_import_dict()
+    import_data['items'].reverse()
+    return import_data
+
+
+@fixture
+@parametrize(
+    items=[
+        # empty import
+        [],
+        # empty folder insertion should update parents
+        # note: this behavior is my first assumption how api should work. It could be incorrect.
+        #  Also, if delta size for any parent is equal to zero, it's considered updated anyway.
+        new_empty_folder5_in_folder2,
+        # file moved down in branch
+        file1_moved_in_folder3,
+        # update from d1/d2/d3/d4 to d1/d3/(d2, d4)
+        child_and_parent_folders_swap
+    ]
+)
+def ok_imports(items, filled_cloud: FakeCloud):
+    date = str(filled_cloud.last_import_date + timedelta(seconds=1))
+
     import_dict = {
-        'items': [folder],
-        'updateDate': str(fake_cloud.last_import_date + timedelta(seconds=1))
+        'items': items,
+        'updateDate': date
     }
 
-    res.append((import_dict, HTTPStatus.BAD_REQUEST))
-    # ################################################################### #
-    return res[request.param]
+    return import_dict
 
 
+@pytest.mark.asyncio
+@parametrize(
+    'import_data, expected_status',
+    [
+        (ok_imports, HTTPStatus.OK),
+        (bad_request_imports, HTTPStatus.BAD_REQUEST),
+        (item_without_tz, HTTPStatus.BAD_REQUEST),
+        (extra_field_import, HTTPStatus.BAD_REQUEST),
+    ]
+)
 async def test_import_cases(
+        import_data,
+        expected_status,
         api_client,
-        fake_cloud,
+        filled_cloud: FakeCloud,
         sync_connection,
-        case):
-
-    import_data, expected_status = case
+):
     if expected_status == HTTPStatus.OK:
-        fake_cloud.load_import(import_data)
+        filled_cloud.load_import(import_data)
     await post_import(api_client, import_data, expected_status=expected_status)
 
-    compare_db_fc_state(sync_connection, fake_cloud)
+    compare_db_fc_state(sync_connection, filled_cloud)
+
+
+async def test_reversed_items_order(
+        filled_cloud: FakeCloud,
+        reversed_items_import_data,
+        api_client,
+        sync_connection
+):
+    await post_import(api_client, reversed_items_import_data, expected_status=HTTPStatus.OK)
+    compare_db_fc_state(sync_connection, filled_cloud)

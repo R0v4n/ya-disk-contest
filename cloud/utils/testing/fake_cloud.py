@@ -162,7 +162,6 @@ class Import(pdt.BaseModel):
             }
 
 
-# todo: write tests for it!
 class FakeCloud:
     faker = fake
     __slots__ = ('_root', '_items', '_imports', '_history', '_folder_ids')
@@ -217,14 +216,13 @@ class FakeCloud:
                     total_size += f.size
                 return total_size
 
-            elif isinstance(schema_item, list):
+            if isinstance(schema_item, list):
                 f = Folder(parent_id=parent_id, date=date, import_id=import_id)
                 self._insert_new_item(f)
                 f.size = sum(build(i, f.id) for i in schema_item)
                 return f.size
 
-            else:
-                raise TypeError('Invalid schema item type (allowed list or int)')
+            raise TypeError('Invalid schema item type (allowed list or int)')
 
         if tree_schemas:
             size = sum(build(schema, parent_id) for schema in tree_schemas)
@@ -358,6 +356,7 @@ class FakeCloud:
     def imports_gen(self):
         return (self.get_import_dict(i.id) for i in self._imports)
 
+    # todo: remove. use getitem
     def get_node_copy(self, path: str) -> Item:
 
         path_elements = path.split('/')
@@ -394,7 +393,7 @@ class FakeCloud:
         node = node.shallow_copy()
         return node
 
-    def __getitem__(self, item: int | tuple[int, ...]):
+    def __getitem__(self, item: int | tuple[int, ...]) -> Item:
         if isinstance(item, int):
             item = item,
 
