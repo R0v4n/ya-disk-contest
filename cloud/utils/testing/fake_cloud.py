@@ -206,18 +206,18 @@ class FakeCloud:
         date = self._imports[-1].date
         import_id = self._imports[-1].id
 
-        def build(schema_item, parent_id: UUID | str):
+        def build(schema_item, prnt_id: UUID | str):
 
             if isinstance(schema_item, int):
                 total_size = 0
                 for _ in range(schema_item):
-                    f = File(parent_id=parent_id, date=date, import_id=import_id)
+                    f = File(parent_id=prnt_id, date=date, import_id=import_id)
                     self._insert_new_item(f)
                     total_size += f.size
                 return total_size
 
             if isinstance(schema_item, list):
-                f = Folder(parent_id=parent_id, date=date, import_id=import_id)
+                f = Folder(parent_id=prnt_id, date=date, import_id=import_id)
                 self._insert_new_item(f)
                 f.size = sum(build(i, f.id) for i in schema_item)
                 return f.size
@@ -347,51 +347,16 @@ class FakeCloud:
 
     def get_import_dict(self, import_id: int = None):
         """
-        first import always has id = 1.
-        :param import_id: if None returns last import data. Can be negative value (-1 is last import data)
+
+        :param import_id:
+            if None returns last import data. First import always has id = 1.
+            Can be negative value (-1 is last import data)
         :return: import data dict formatted according to API spec.
         """
         return self._get_import_obj(import_id).import_dict()
 
     def imports_gen(self):
         return (self.get_import_dict(i.id) for i in self._imports)
-
-    # todo: remove. use getitem
-    def get_node_copy(self, path: str) -> Item:
-
-        path_elements = path.split('/')
-        if path_elements[0] == '':
-            path_elements = path_elements[1:]
-
-        node: Item | None = None
-
-        def find_node(nodes: list[Item], names: list[str]):
-            nonlocal node
-
-            name = names[0]
-            num = int(name[1])
-            searching_type = Folder if name[0] == 'd' else File
-
-            c = 0
-            for i in nodes:
-                if type(i) == searching_type:
-                    c += 1
-                if c == num:
-                    if searching_type == Folder:
-                        if len(names) > 1:
-                            find_node(i.children, names[1:])
-                        else:
-                            node = i
-                    else:
-                        node = i
-                    break
-            else:
-                raise ValueError('Path does not exist.')
-
-        find_node(self._root.children, path_elements)
-
-        node = node.shallow_copy()
-        return node
 
     def __getitem__(self, item: int | tuple[int, ...]) -> Item:
         if isinstance(item, int):
@@ -474,7 +439,8 @@ class FakeCloud:
         self._imports.append(Import(id=len(self._imports) + 1, date=date))
 
         if len(self._imports) > 1 and self._imports[-2].date >= self._imports[-1].date:
-            raise ValueError('The new import date must be greater than previous one.')
+            raise ValueError(f'The new import date ({self._imports[-1].date}) '
+                             f'must be greater than previous one ({self._imports[-2].date})')
 
         return self._imports[-1].id
 

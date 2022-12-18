@@ -15,7 +15,8 @@ class BaseImportModel:
     __slots__ = ('_date', '_import_id', '_conn')
 
     def __init__(self, date: datetime | None):
-        # todo: date is None in some cases. need check and refactor probably
+        # todo: date is None for NodeModel instantiated for GET node and GET node history.
+        #  This is anti SOLID. Need refactor NodeModel (separate get methods probably)
         if date is not None and date.tzinfo is None:
             raise HTTPBadRequest
 

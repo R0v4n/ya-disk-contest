@@ -1,30 +1,31 @@
+from dataclasses import dataclass
 from typing import Iterable
 
 from deepdiff import DeepDiff
-from devtools import debug
 from sqlalchemy.engine import Connection
 
 from cloud.api.model import ItemType
 from cloud.db.schema import imports_table, folders_table, files_table, folder_history, file_history
-from .fake_cloud import FakeCloud
 from .api_methods import get_node
-
+from .fake_cloud import FakeCloud
 
 __all__ = (
-    'import_dataset',
+    'Dataset',
+    'direct_import_to_db',
     'get_history_records',
     'get_node_records',
     'get_imports_records',
     'compare_db_fc_node_trees',
     'compare_db_fc_state',
+    'compare'
 )
 
 
-def import_dataset(connection: Connection, dataset: dict):
+def direct_import_to_db(connection: Connection, data: dict):
     """Direct data insertion into db, without calculating folder sizes and history."""
-    items = dataset['items']
+    items = data['items']
 
-    query = imports_table.insert().values({'date': dataset['updateDate']}).returning(imports_table.c.id)
+    query = imports_table.insert().values({'date': data['updateDate']}).returning(imports_table.c.id)
     import_id = connection.execute(query).scalar()
 
     folders = [n for n in items if n['type'] == ItemType.FOLDER.value]
@@ -70,20 +71,10 @@ def get_imports_records(connection: Connection):
     return [dict(row) for row in connection.execute(imports_table.select())]
 
 
-def compare(received, expected, obj_note=None, **kwargs):
-    if not kwargs:
-        kwargs = dict(ignore_order=True)
+def compare(received, expected, assertion_error_note=None, ignore_order=True, **kwargs):
 
-    diff = DeepDiff(received, expected, **kwargs)
-    try:
-        assert diff == {}
-    except AssertionError:
-        if obj_note:
-            debug(obj_note)
-        # debug(received)
-        # debug(expected)
-        debug(diff)
-        raise
+    diff = DeepDiff(received, expected, ignore_order=ignore_order, **kwargs)
+    assert diff == {}, assertion_error_note
 
 
 def compare_db_fc_state(connection: Connection, fake_cloud: FakeCloud):
@@ -91,21 +82,21 @@ def compare_db_fc_state(connection: Connection, fake_cloud: FakeCloud):
     received_imports = get_imports_records(connection)
     expected_imports = fake_cloud.get_raw_db_imports_records()
 
-    compare(received_imports, expected_imports, 'imports:', ignore_order=True)
+    compare(received_imports, expected_imports, 'imports!')
 
     received_files = get_node_records(connection, ItemType.FILE)
     received_folders = get_node_records(connection, ItemType.FOLDER)
     expected_files, expected_folders = fake_cloud.get_raw_db_node_records()
-    compare(received_files, expected_files, 'files:', ignore_order=True)
 
-    compare(received_folders, expected_folders, 'folders:', ignore_order=True)
+    compare(received_files, expected_files, 'files!')
+    compare(received_folders, expected_folders, 'folders!')
 
     received_file_history = get_history_records(connection, ItemType.FILE)
     received_folder_history = get_history_records(connection, ItemType.FOLDER)
     expected_file_history, expected_folder_history = fake_cloud.get_raw_db_history_records()
-    compare(received_file_history, expected_file_history, 'file history:', ignore_order=True)
 
-    compare(received_folder_history, expected_folder_history, 'folder history:', ignore_order=True)
+    compare(received_file_history, expected_file_history, 'file history!')
+    compare(received_folder_history, expected_folder_history, 'folder history!')
 
 
 async def compare_db_fc_node_trees(api_client, fake_cloud: FakeCloud,
@@ -120,3 +111,11 @@ async def compare_db_fc_node_trees(api_client, fake_cloud: FakeCloud,
         diff = DeepDiff(received_tree, expected_tree, ignore_order=True)
         assert diff == {}
 
+
+@dataclass
+class Dataset:
+    """Namespace for convenience"""
+    import_dict: dict | None = None
+    node_id: str | None = None
+    expected_tree: dict | None = None
+    expected_history: list[dict] | None = None

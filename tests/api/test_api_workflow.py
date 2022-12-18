@@ -1,4 +1,4 @@
-from random import randint
+from random import randint, shuffle
 
 from devtools import debug
 
@@ -22,6 +22,7 @@ async def test(api_client, sync_connection):
         fake_cloud.random_updates(count=4)
 
         import_data = fake_cloud.get_import_dict()
+        shuffle(import_data['items'])
         # last_correct_storage_tree = fake_cloud.get_tree()
 
         await post_import(api_client, import_data)
@@ -41,4 +42,3 @@ async def test(api_client, sync_connection):
                 debug(fake_cloud.get_tree())
                 # debug(last_correct_storage_tree)
                 raise
-

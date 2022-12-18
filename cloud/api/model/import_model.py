@@ -148,7 +148,10 @@ class NodeListBaseModel(ABC):
 
     async def update_existent(self):
         if self.existent_ids:
-            mapping = {key: f'${i}' for i, key in enumerate(ImportItem.db_fields_set(self.NodeT) | {'import_id'}, start=1)}
+            mapping = {
+                key: f'${i}'
+                for i, key in enumerate(ImportItem.db_fields_set(self.NodeT) | {'import_id'}, start=1)
+            }
 
             rows = [
                 [node.db_dict(self.import_id)[key] for key in mapping]

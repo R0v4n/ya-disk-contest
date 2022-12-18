@@ -1,18 +1,41 @@
 import pytest
 from deepdiff import DeepDiff
+from pytest_cases import parametrize_with_cases
 
 from cloud.api.model import ItemType
-from cloud.utils.testing import FakeCloud
+from cloud.utils.testing import FakeCloud, Dataset
+from tests import post_import_cases, get_node_cases
 
 
-def test_with_static_data(fake_cloud, dataset_for_post_import):
-    dataset = dataset_for_post_import
-    for data in dataset.import_dicts:
-        fake_cloud.load_import(data)
-        assert DeepDiff(data, fake_cloud.get_import_dict(), ignore_order=True) == {}
+@parametrize_with_cases('dataset', post_import_cases)
+def test_load_import_with_static_data(fake_cloud_module, dataset: Dataset):
+    fake_cloud_module.load_import(dataset.import_dict)
+    assert DeepDiff(dataset.import_dict, fake_cloud_module.get_import_dict(), ignore_order=True) == {}
+    assert DeepDiff(fake_cloud_module.get_all_history(), dataset.expected_history, ignore_order=True) == {}
 
-    assert DeepDiff(dataset.expected_tree, fake_cloud.get_tree(dataset.node_id), ignore_order=True) == {}
-    assert DeepDiff(fake_cloud.get_all_history(), dataset.expected_history, ignore_order=True) == {}
+
+@parametrize_with_cases('dataset', get_node_cases)
+def test_node_tree_with_static_data(fake_cloud, dataset: Dataset):
+    fake_cloud.load_import(dataset.import_dict)
+    assert DeepDiff(dataset.import_dict, fake_cloud.get_import_dict(), ignore_order=True) == {}
+    assert DeepDiff(
+        fake_cloud.get_tree(dataset.node_id, nullify_folder_sizes=True),
+        dataset.expected_tree, ignore_order=True
+    ) == {}
+
+
+@pytest.mark.parametrize('schemas',
+                         [(1, ), ([],), ([1],), ([1], 1), ([2, [2]], [1], 2, 1)],
+                         ids=(lambda s: ', '.join(str(i) for i in s)))
+def test_generate_with_load(schemas):
+    fc1 = FakeCloud()
+    fc2 = FakeCloud()
+
+    fc1.generate_import(*schemas)
+    data1 = fc1.get_import_dict()
+    fc2.load_import(data1)
+
+    assert DeepDiff(data1, fc2.get_import_dict(), ignore_order=True) == {}
 
 
 cloud = FakeCloud()
@@ -35,7 +58,7 @@ def test_getitem(item, type_, parent_id):
 @pytest.mark.parametrize('item', [2, (0, 3), (1, 0), (0, 2, 1), (0, 2, 0, 0)])
 def test_incorrect_getitem(item):
     with pytest.raises(IndexError):
-        i = cloud[item]
+        _ = cloud[item]
 
 
 def test_generate_import_parent_size():

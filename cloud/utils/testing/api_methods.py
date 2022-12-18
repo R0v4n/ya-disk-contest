@@ -70,7 +70,7 @@ async def get_node(
         client: TestClient,
         node_id: str,
         expected_status: int | Enum = HTTPStatus.OK,
-        **request_kwargs) -> list[dict]:
+        **request_kwargs) -> list[dict] | ClientResponse:
 
     response = await client.get(
         url_for(NodeView.URL_PATH, dict(node_id=node_id)),

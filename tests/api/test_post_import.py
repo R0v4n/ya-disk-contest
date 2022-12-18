@@ -2,19 +2,23 @@ from datetime import timedelta
 from http import HTTPStatus
 
 import pytest
-from pytest_cases import parametrize, fixture, AUTO
+from pytest_cases import parametrize, fixture, AUTO, parametrize_with_cases
 
 from cloud.api.model import ItemType
-from cloud.utils.testing import post_import, FakeCloud, compare_db_fc_state, Folder, File
+from cloud.utils.testing import post_import, FakeCloud, compare_db_fc_state, Folder, File, Dataset
+from tests import post_import_cases
 
 
-async def test_with_static_data(api_client, fake_cloud, sync_connection, dataset_for_post_import):
-
-    for batch in dataset_for_post_import.import_dicts:
-        fake_cloud.load_import(batch)
-        await post_import(api_client, batch)
-
-        compare_db_fc_state(sync_connection, fake_cloud)
+@parametrize_with_cases('dataset', cases=post_import_cases)
+async def test_with_static_data(
+        dataset: Dataset,
+        api_client_module,
+        fake_cloud_module,
+        sync_connection_module
+):
+    fake_cloud_module.load_import(dataset.import_dict)
+    await post_import(api_client_module, dataset.import_dict)
+    compare_db_fc_state(sync_connection_module, fake_cloud_module)
 
 
 @pytest.fixture
@@ -149,7 +153,7 @@ def extra_field_import(filled_cloud: FakeCloud):
 
 
 @fixture
-def item_without_tz(filled_cloud: FakeCloud):
+def date_without_tz_import(filled_cloud: FakeCloud):
     date = str((filled_cloud.last_import_date + timedelta(seconds=1)).replace(tzinfo=None))
 
     import_dict = {
@@ -200,7 +204,7 @@ def ok_imports(items, filled_cloud: FakeCloud):
     [
         (ok_imports, HTTPStatus.OK),
         (bad_request_imports, HTTPStatus.BAD_REQUEST),
-        (item_without_tz, HTTPStatus.BAD_REQUEST),
+        (date_without_tz_import, HTTPStatus.BAD_REQUEST),
         (extra_field_import, HTTPStatus.BAD_REQUEST),
     ]
 )

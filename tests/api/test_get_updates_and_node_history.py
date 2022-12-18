@@ -2,7 +2,6 @@ from datetime import timedelta
 
 import pytest
 from deepdiff import DeepDiff
-from devtools import debug
 
 from cloud.utils.testing import post_import, FakeCloud, get_updates, get_node_history
 
@@ -45,10 +44,8 @@ deltas = [
     25
 ]
 
-names = [f'hours_range: [{d-24}; {d}]' for d in deltas]
 
-
-@pytest.fixture(params=deltas, ids=names)
+@pytest.fixture(params=deltas, ids=(lambda d: f'hours_range: [{d-24}; {d}]'))
 def date(request, cloud):
     return cloud.last_import_date + timedelta(hours=request.param)
 
@@ -84,10 +81,8 @@ deltas = [
     (1, 24),
 ]
 
-names = [f'hours_range: [{d[0]}; {d[1]})' for d in deltas]
 
-
-@pytest.fixture(params=deltas, ids=names)
+@pytest.fixture(params=deltas, ids=(lambda d: f'hours_range: [{d[0]}; {d[1]})'))
 def date_range(request, cloud):
     return tuple(cloud.last_import_date + timedelta(hours=d) for d in request.param)
 

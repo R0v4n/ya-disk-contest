@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Iterable, Mapping, Any
+from typing import Iterable, Mapping, Any, TypeVar
 
 from .data_classes import ImportItem, ItemType, ExportItem, Item
 
 
-# todo: think about Tree interface
-# todo: install python 3.11 and use Self
-
+# todo: how to deal with type hints here?
 class TreeMixin(ABC):
 
     def __init__(self, **kwargs):
@@ -17,22 +15,21 @@ class TreeMixin(ABC):
 
     @classmethod
     @abstractmethod
-    def construct(cls, **kwargs) -> 'Self':
+    def construct(cls, **kwargs) -> TreeT:
         """method of pydantic.BaseModel"""
 
     @classmethod
-    def from_records(cls, records: Iterable[Mapping[str, Any]]) -> list['Self']:
+    def from_records(cls, records: Iterable[Mapping[str, Any]]) -> list[TreeT]:
         nodes = (cls(**rec) for rec in records)
         return cls.from_nodes(nodes)
 
     @classmethod
-    def from_nodes(cls, nodes: Iterable[Item | 'Self']) -> list['Self']:
+    def from_nodes(cls, nodes: Iterable[Item | TreeT]) -> list[TreeT]:
 
-        id_children_map: dict[str | None, list['Self']] = defaultdict(list)
+        id_children_map: dict[str | None, list[TreeT]] = defaultdict(list)
 
         ids = set()
         for node in nodes:
-            # fixme: how to improve this?
             if type(node) != cls:
                 node = cls.construct(**node.dict(by_alias=True))
 
@@ -69,3 +66,7 @@ class ImportNodeTree(ImportItem, TreeMixin):
                     yield from get_dict(child)
 
         return get_dict(self)
+
+
+TreeT = TypeVar('TreeT', ExportNodeTree, ImportNodeTree)
+

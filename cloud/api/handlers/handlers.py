@@ -9,8 +9,6 @@ from ..model import ImportData, ImportModel, NodeModel, ExportNodeTree, HistoryM
 from ..model.data_classes import ExportItem
 
 
-# todo: Is there a way to generate a more precise specs with aiohttp-pydantic?
-
 class ImportsView(BasePydanticView):
     URL_PATH = '/imports'
     ModelT = ImportModel
