@@ -71,9 +71,15 @@ def get_imports_records(connection: Connection):
     return [dict(row) for row in connection.execute(imports_table.select())]
 
 
-def compare(received, expected, assertion_error_note=None, ignore_order=True, **kwargs):
+def compare(
+        received,
+        expected,
+        assertion_error_note=None,
+        ignore_order=True,
+        report_repetition=True,
+        **kwargs):
 
-    diff = DeepDiff(received, expected, ignore_order=ignore_order, **kwargs)
+    diff = DeepDiff(received, expected, ignore_order=ignore_order, report_repetition=report_repetition, **kwargs)
     assert diff == {}, assertion_error_note
 
 
@@ -108,8 +114,7 @@ async def compare_db_fc_node_trees(api_client, fake_cloud: FakeCloud,
         expected_tree = fake_cloud.get_tree(node_id, nullify_folder_sizes=nullify_folder_sizes)
         received_tree = await get_node(api_client, node_id)
 
-        diff = DeepDiff(received_tree, expected_tree, ignore_order=True)
-        assert diff == {}
+        compare(received_tree, expected_tree)
 
 
 @dataclass

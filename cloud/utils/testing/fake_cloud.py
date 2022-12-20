@@ -89,7 +89,7 @@ class Item(pdt.BaseModel):
         for key, val in fields.items():
             setattr(self, key, val)
 
-    def shallow_copy(self):
+    def shallow_copy(self) -> Item:
         children_default = None if type(Item) == File else []
         return self.copy(update={'children': children_default, 'import_id': self.import_id})
 
@@ -284,6 +284,9 @@ class FakeCloud:
         self._update_parents(item.parent_id, item.size)
 
         self._imports[-1].add_item(item)
+
+    def get_node_copy(self, node_id):
+        return self._items[node_id].shallow_copy()
 
     def get_tree(self, node_id=None, nullify_folder_sizes=False) -> dict[str, Any]:
         return self._items[node_id].tree_dict(nullify_folder_sizes)

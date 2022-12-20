@@ -1,9 +1,8 @@
 from datetime import timedelta
 
 import pytest
-from deepdiff import DeepDiff
 
-from cloud.utils.testing import post_import, FakeCloud, get_updates, get_node_history
+from cloud.utils.testing import post_import, FakeCloud, get_updates, get_node_history, compare
 
 
 @pytest.fixture(scope='module')
@@ -61,8 +60,8 @@ async def test_updates(api_client, cloud, date):
 
     expected_updates = cloud.get_updates(date_end=date)
     received_updates = await get_updates(api_client, date)
-
-    assert DeepDiff(expected_updates, received_updates, ignore_order=True) == {}
+    print(received_updates)
+    compare(received_updates, expected_updates)
 
 
 # -1 is first import datetime, 0 is second
@@ -102,4 +101,4 @@ async def test_node_history(api_client, cloud, date_range, id_):
     expected_history = cloud.get_node_history(id_, date_start, date_end)
     received_history = await get_node_history(api_client, id_, date_start, date_end)
 
-    assert DeepDiff(expected_history, received_history, ignore_order=True) == {}
+    compare(received_history, expected_history)
