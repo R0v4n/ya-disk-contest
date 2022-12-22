@@ -205,7 +205,40 @@ class FolderQuery(QueryBase):
 
     @classmethod
     def get_node_select_query(cls, node_id: str):
-        return cls.select_folder_tree(node_id)
+        # return cls.select_folder_tree(node_id)
+        return f"""WITH RECURSIVE anon_1(id, parent_id, size, url, date, type) AS
+                   (SELECT folders.id        AS id,
+                           folders.parent_id AS parent_id,
+                           folders.size      AS size,
+                           CAST(NULL as varchar)  AS url,
+                           imports.date      AS date,
+                           'FOLDER'          AS type
+                    FROM folders
+                             JOIN imports ON imports.id = folders.import_id
+                    WHERE folders.id = '{node_id}'
+                    UNION ALL
+                    select t.id, t.parent_id, t.size, t.url, t.date, t.type
+                    from (SELECT folders.id        AS id,
+                                 folders.parent_id AS parent_id,
+                                 folders.size      AS size,
+                                 NULL              AS url,
+                                 imports.date      AS date,
+                                 'FOLDER'          AS type
+                          FROM folders
+                                   JOIN imports ON imports.id = folders.import_id
+                          union all
+                          SELECT files.id        AS id,
+                                 files.parent_id AS parent_id,
+                                 files.size      AS size,
+                                 files.url       AS url,
+                                 imports.date    AS date,
+                                 'FILE'          AS type
+                          FROM files
+                                   JOIN imports ON imports.id = files.import_id) as t
+                             JOIN anon_1 ON t.parent_id = anon_1.id)
+
+SELECT anon_1.id, anon_1.parent_id, anon_1.size, anon_1.url, anon_1.date, anon_1.type
+FROM anon_1;"""
 
     @classmethod
     def recursive_parents_with_size(cls, file_ids: Iterable[str] | str | None,

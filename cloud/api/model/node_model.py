@@ -41,10 +41,15 @@ class NodeModel(BaseImportModel):
         raise HTTPNotFound()
 
     async def get_node(self) -> dict[str, Any]:
-        res = await self.conn.fetch(self.query.get_node_select_query(self.node_id))
+        res = []
+        async with self.conn.transaction() as conn:
+            cursor = conn.cursor(self.query.get_node_select_query(self.node_id))
+            async for rec in cursor:
+                res.append(rec)
+        # res = await self.conn.fetch(self.query.get_node_select_query(self.node_id))
         # In general from_records returns a list[NodeTree]. In this case it will always be a single NodeTree list.
         tree = ExportNodeTree.from_records(res)[0]
-        return tree.dict(by_alias=True)
+        return tree
 
     async def execute_delete_node(self):
         await self.insert_import()

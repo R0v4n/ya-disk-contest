@@ -38,6 +38,7 @@ class JsonPayload(BaseJsonPayload):
     Заменяет функцию сериализации на более "умную" (умеющую упаковывать в JSON
     объекты asyncpg.Record и другие сущности).
     """
+
     def __init__(self,
                  value: Any,
                  encoding: str = 'utf-8',
@@ -48,11 +49,37 @@ class JsonPayload(BaseJsonPayload):
         super().__init__(value, encoding, content_type, dumps, *args, **kwargs)
 
 
+class JsonNodeTreeListPayload(Payload):
+    def __init__(self, value, encoding: str = 'utf-8',
+                 content_type: str = 'application/json',
+                 *args, **kwargs):
+        super().__init__(value, content_type=content_type, encoding=encoding,
+                         *args, **kwargs)
+
+    async def write(self, writer):
+        it = iter(self._value)
+
+        async def write_node(it, parent_id):
+            row = next(it)
+            rec = dumps(row).encode(self._encoding)[:-1]
+            await writer.write(rec)
+
+            await writer.write(b', "children": ')
+            if row['type'] == ItemType.FOLDER.value:
+                await writer.write(b'[')
+                await write_node(it, row['parent_id'])
+                await writer.write(b']}')
+            else:
+                await writer.write(b'null')
+            await writer.write(b'}')
+
+
 class AsyncGenJsonListPayload(Payload):
     """
     Итерируется по объектам AsyncIterable, частями сериализует данные из них
     в JSON и отправляет клиенту.
     """
+
     def __init__(self, value, encoding: str = 'utf-8',
                  content_type: str = 'application/json',
                  root_object: str = 'items',
@@ -82,5 +109,5 @@ class AsyncGenJsonListPayload(Payload):
 
 
 __all__ = (
-    'JsonPayload', 'AsyncGenJsonListPayload'
+    'JsonPayload', 'AsyncGenJsonListPayload', 'JsonNodeTreeListPayload'
 )

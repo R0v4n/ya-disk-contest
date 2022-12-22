@@ -117,12 +117,12 @@ def case_folder_tree():
                                 'size': 122,
                                 'date': '2022-10-25 09:05:43.818731+00:00',
                                 'children': None,
-                            },
-                        ],
-                    },
-                ],
-            },
-        ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
     }
 
     return Dataset(import_data, id_, expected_tree)
