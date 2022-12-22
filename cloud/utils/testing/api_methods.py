@@ -36,11 +36,11 @@ def url_for(path: str, path_params: dict = None, query_params: dict = None) -> s
 def expected_error_response(http_status_code: int):
     msg_dict = {
         HTTPStatus.NOT_FOUND: 'Item not found',
-        HTTPStatus.BAD_REQUEST: 'Validation failed'
+        HTTPStatus.BAD_REQUEST: 'Validation failed',
     }
     return {
         'code': http_status_code,
-        'message': msg_dict[http_status_code]
+        'message': msg_dict.get(http_status_code, HTTPStatus(http_status_code).description)
     }
 
 

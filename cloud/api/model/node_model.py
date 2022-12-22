@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, AsyncIterable
 
 from aiohttp.web_exceptions import HTTPNotFound, HTTPBadRequest
 
@@ -7,6 +7,8 @@ from .base_model import BaseImportModel
 from .data_classes import ItemType, ExportItem
 from .node_tree import ExportNodeTree
 from .query_builder import FileQuery, FolderQuery, Sign, QueryT
+
+from cloud.utils.pg import SelectQuery
 
 
 class NodeModel(BaseImportModel):
@@ -57,14 +59,27 @@ class NodeModel(BaseImportModel):
         await self.conn.execute(update_q)
         await self.conn.execute(self.query.delete(self.node_id))
 
-    async def get_node_history(self, date_start: datetime, date_end: datetime) -> list[dict[str, Any]]:
+    async def get_node_history(
+            self,
+            date_start: datetime,
+            date_end: datetime) -> AsyncIterable[dict[str, Any]]:
 
         if date_start >= date_end or date_end.tzinfo is None or date_start.tzinfo is None:
             raise HTTPBadRequest
 
         query = self.query.select_nodes_union_history_in_daterange(date_start, date_end, self.node_id, closed=False)
 
-        res = await self.conn.fetch(query)
-        nodes = [ExportItem(type=self.node_type, **rec).dict(by_alias=True) for rec in res]
+        async def f(pg):
+            async with pg.transaction() as conn:
+                cursor = conn.cursor(query)
+                async for rec in cursor:
+                    yield ExportItem(type=self.node_type, **rec).dict(by_alias=True)
 
-        return nodes
+        return f(self.conn)
+        # nodes = (ExportItem(type=self.node_type, **rec).dict(by_alias=True) async for rec in cursor)
+        # def transform(rec):
+        #     return ExportItem(type=self.node_type, **rec).dict(by_alias=True)
+        #
+        # return SelectQuery(query, self.conn.transaction(), transform)
+
+

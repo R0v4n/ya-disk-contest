@@ -39,7 +39,7 @@ class User(HttpUser):
     @classmethod
     def next_import_date(cls):
         # lesser timedelta will cause huge updates response size.
-        cls._last_import_date += timedelta(hours=randint(3, 72))
+        cls._last_import_date += timedelta(hours=randint(1, 6))
         return cls._last_import_date
 
     def make_dataset(self):

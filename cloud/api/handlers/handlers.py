@@ -1,10 +1,9 @@
 from datetime import datetime
 
-from aiohttp.web_response import Response, json_response
+from aiohttp.web_response import Response
 from aiohttp_pydantic.oas.typing import r200, r404, r400
 
 from .base import BasePydanticView
-from .payloads import dumps
 from ..model import ImportData, ImportModel, NodeModel, ExportNodeTree, HistoryModel, Error
 from ..model.data_classes import ExportItem
 
@@ -66,7 +65,7 @@ class NodeView(BasePydanticView):
         mdl = NodeModel(node_id)
         await mdl.init(self.pg)
         node = await mdl.get_node()
-        return json_response(node, dumps=dumps)
+        return Response(body=node)
 
 
 class DeleteNodeView(BasePydanticView):
@@ -109,7 +108,7 @@ class UpdatesView(BasePydanticView):
         mdl = HistoryModel(self.pg, date)
         nodes = await mdl.get_files_updates_24h()
 
-        return json_response({'items': nodes}, dumps=dumps)
+        return Response(body=nodes)
 
 
 class NodeHistoryView(BasePydanticView):
@@ -135,4 +134,4 @@ class NodeHistoryView(BasePydanticView):
         await mdl.init(self.pg)
         nodes = await mdl.get_node_history(dateStart, dateEnd)
 
-        return json_response({'items': nodes}, dumps=dumps)
+        return Response(body=nodes)

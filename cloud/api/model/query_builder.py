@@ -59,10 +59,8 @@ class QueryBase(ABC, QueryToolsMixin):
     @classmethod
     def select_node_with_date(cls, node_id: str, columns: list[str | None] | None = None):
         """
-        Select node record with additional fields type and date.
-        Used for get_node api method.
+        Select node record with additional field date.
         """
-        columns += [literal_column(f"'{cls.node_type.value}'", String).label('type')]
 
         return select(cls._build_columns(cls.table, columns) + [imports_table.c.date]). \
             select_from(cls.table.join(imports_table)). \
@@ -169,7 +167,6 @@ class FolderQuery(QueryBase):
     def folder_tree_cte(cls, folder_id: str):
         cols = ['id', 'parent_id', 'size', Null().label('url'), imports_table.c.date]
 
-        # cols gets additional column 'type' in select_node_with_date. It's handles the task, but need refactor.
         top_folder = cls.select_node_with_date(
             folder_id,
             cols
@@ -191,14 +188,18 @@ class FolderQuery(QueryBase):
     def select_folder_tree(cls, folder_id: str):
         tree_cte = cls.folder_tree_cte(folder_id)
 
-        cols = ['id', 'parent_id', 'size', 'url', imports_table.c.date]
-        cols += [literal_column(f"'{ItemType.FILE.value}'", String).label('type')]
+        file_cols = ['id', 'parent_id', 'size', 'url', imports_table.c.date,
+                     literal_column(f"'{ItemType.FILE.value}'", String).label('type')]
 
-        query = select(cls._build_columns(files_table, cols)). \
-            select_from(
-            files_table.join(imports_table).
-            join(tree_cte)
-        ).union_all(tree_cte.select())
+        folder_cols = ['id', 'parent_id', 'size', 'url', 'date',
+                       literal_column(f"'{ItemType.FOLDER.value}'", String).label('type')]
+
+        query = select(cls._build_columns(tree_cte, folder_cols)). \
+            select_from(tree_cte). \
+            union_all(
+                select(cls._build_columns(files_table, file_cols)).
+                select_from(files_table.join(imports_table).join(tree_cte))
+            )
 
         return query
 
@@ -285,4 +286,6 @@ class FileQuery(QueryBase):
 
     @classmethod
     def get_node_select_query(cls, node_id: str):
-        return cls.select_node_with_date(node_id, ['id', 'parent_id', 'url', 'size'])
+        columns = ['id', 'parent_id', 'url', 'size',
+                   literal_column(f"'{cls.node_type.value}'", String).label('type')]
+        return cls.select_node_with_date(node_id, columns)
