@@ -1,4 +1,5 @@
 import json
+from collections import deque
 from datetime import datetime
 from functools import partial, singledispatch
 from typing import Any
@@ -49,7 +50,7 @@ class JsonPayload(BaseJsonPayload):
         super().__init__(value, encoding, content_type, dumps, *args, **kwargs)
 
 
-class JsonNodeTreeListPayload(Payload):
+class JsonNodeTreeAsyncGenPayload(Payload):
     def __init__(self, value, encoding: str = 'utf-8',
                  content_type: str = 'application/json',
                  *args, **kwargs):
@@ -57,21 +58,78 @@ class JsonNodeTreeListPayload(Payload):
                          *args, **kwargs)
 
     async def write(self, writer):
-        it = iter(self._value)
+        pr = partial(print, end='')
+        # pr = lambda *args: None
+        parents = deque()
+        opened = 0
+        first_children = True
+        async for row in self._value.records:
+            start = True
+            while parents and row['parentId'] != parents[-1]:
+                parents.pop()
+                if not start:
+                    await writer.write(b',')
+                    pr(',')
+                else:
+                    start = False
+                await writer.write(b']}')
+                opened -= 1
+                pr(']}')
 
-        async def write_node(it, parent_id):
-            row = next(it)
+            if not first_children:
+                await writer.write(b',')
+                pr(',')
+            else:
+                first_children = False
+
             rec = dumps(row).encode(self._encoding)[:-1]
+            pr(dumps(row)[:-1])
             await writer.write(rec)
 
             await writer.write(b', "children": ')
+            pr(', "children": ')
             if row['type'] == ItemType.FOLDER.value:
+                parents.append(row['id'])
+                opened += 1
+                first_children = True
                 await writer.write(b'[')
-                await write_node(it, row['parent_id'])
-                await writer.write(b']}')
+                pr('[')
             else:
                 await writer.write(b'null')
-            await writer.write(b'}')
+                pr('null')
+                await writer.write(b'}')
+                pr('}')
+
+        for _ in range(opened):
+            await writer.write(b']}')
+            pr(']}')
+
+        # await writer.write(b']}')
+        # pr(']}')
+
+        # async def write_node(parent_id):
+        #     nonlocal row
+        #     row = next(it)
+        #     if row['parent_id'] == parent_id or parent_id == sentinel:
+        #         rec = dumps(row).encode(self._encoding)[:-1]
+        #         print(rec)
+        #         await writer.write(rec)
+        #
+        #         await writer.write(b', "children": ')
+        #         print(', "children": ')
+        #         if row['type'] == ItemType.FOLDER.value:
+        #             await writer.write(b'[')
+        #             print('[')
+        #             for row in it:
+        #                 await write_node(row['id'])
+        #             await writer.write(b']')
+        #             print(']')
+        #         else:
+        #             await writer.write(b'null')
+        #             print('null')
+        #         await writer.write(b'}')
+        #         print('}')
+        # await write_node(sentinel)
 
 
 class AsyncGenJsonListPayload(Payload):
@@ -109,5 +167,5 @@ class AsyncGenJsonListPayload(Payload):
 
 
 __all__ = (
-    'JsonPayload', 'AsyncGenJsonListPayload', 'JsonNodeTreeListPayload'
+    'JsonPayload', 'AsyncGenJsonListPayload', 'JsonNodeTreeAsyncGenPayload'
 )

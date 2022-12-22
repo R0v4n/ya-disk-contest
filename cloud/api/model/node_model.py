@@ -1,18 +1,16 @@
 from datetime import datetime
-from typing import Any, AsyncIterable
+from typing import Any, AsyncGenerator
 
 from aiohttp.web_exceptions import HTTPNotFound, HTTPBadRequest
 
 from .base_model import BaseImportModel
 from .data_classes import ItemType, ExportItem
-from .node_tree import ExportNodeTree
 from .query_builder import FileQuery, FolderQuery, Sign, QueryT
 
-from cloud.utils.pg import SelectQuery
+from cloud.utils.pg import TreeRecordsHolder, select_query_async_gen
 
 
 class NodeModel(BaseImportModel):
-
     __slots__ = ('node_id', '_query', '_node_type')
 
     def __init__(self, node_id: str, date: datetime | None = None):
@@ -40,16 +38,13 @@ class NodeModel(BaseImportModel):
 
         raise HTTPNotFound()
 
-    async def get_node(self) -> dict[str, Any]:
-        res = []
-        async with self.conn.transaction() as conn:
-            cursor = conn.cursor(self.query.get_node_select_query(self.node_id))
-            async for rec in cursor:
-                res.append(rec)
-        # res = await self.conn.fetch(self.query.get_node_select_query(self.node_id))
-        # In general from_records returns a list[NodeTree]. In this case it will always be a single NodeTree list.
-        tree = ExportNodeTree.from_records(res)[0]
-        return tree
+    async def get_node(self):
+        return TreeRecordsHolder(
+            select_query_async_gen(
+                self.query.get_node_select_query(self.node_id),
+                self.conn.transaction()
+            )
+        )
 
     async def execute_delete_node(self):
         await self.insert_import()
@@ -67,24 +62,17 @@ class NodeModel(BaseImportModel):
     async def get_node_history(
             self,
             date_start: datetime,
-            date_end: datetime) -> AsyncIterable[dict[str, Any]]:
+            date_end: datetime) -> AsyncGenerator[dict[str, Any], Any]:
 
         if date_start >= date_end or date_end.tzinfo is None or date_start.tzinfo is None:
             raise HTTPBadRequest
 
-        query = self.query.select_nodes_union_history_in_daterange(date_start, date_end, self.node_id, closed=False)
+        query = self.query.select_nodes_union_history_in_daterange(
+            date_start, date_end, self.node_id, closed=False)
 
-        async def f(pg):
-            async with pg.transaction() as conn:
-                cursor = conn.cursor(query)
-                async for rec in cursor:
-                    yield ExportItem(type=self.node_type, **rec).dict(by_alias=True)
-
-        return f(self.conn)
-        # nodes = (ExportItem(type=self.node_type, **rec).dict(by_alias=True) async for rec in cursor)
-        # def transform(rec):
-        #     return ExportItem(type=self.node_type, **rec).dict(by_alias=True)
-        #
-        # return SelectQuery(query, self.conn.transaction(), transform)
-
+        return select_query_async_gen(
+            query,
+            self.conn.transaction(),
+            lambda rec: ExportItem(type=self.node_type, **rec).dict(by_alias=True)
+        )
 

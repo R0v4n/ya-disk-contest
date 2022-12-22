@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from deepdiff import DeepDiff
+from devtools import debug
 from sqlalchemy.engine import Connection
 
 from cloud.api.model import ItemType
@@ -112,10 +113,16 @@ async def compare_db_fc_node_trees(api_client, fake_cloud: FakeCloud,
 
     for node_id in ids:
         expected_tree = fake_cloud.get_tree(node_id, nullify_folder_sizes=nullify_folder_sizes)
-        received_tree = await get_node(api_client, node_id)
-
-        compare(received_tree, expected_tree)
-
+        try:
+            received_tree = await get_node(api_client, node_id)
+        except ValueError:
+            debug(expected_tree)
+            raise
+        try:
+            compare(received_tree, expected_tree)
+        except AssertionError:
+            debug(expected_tree)
+            raise
 
 @dataclass
 class Dataset:

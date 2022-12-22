@@ -1,10 +1,12 @@
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import AsyncIterable, Callable
+from typing import AsyncIterable, Callable, AsyncGenerator, Any
 
 from aiohttp.web_app import Application
 from alembic.config import Config
+from asyncpg import Record
 from asyncpgsa import PG
 from asyncpgsa.transactionmanager import ConnectionTransactionContextManager
 from configargparse import Namespace
@@ -64,31 +66,18 @@ def make_alembic_config(cmd_opts: Namespace | SimpleNamespace, base_path: str | 
     return config
 
 
-class SelectQuery(AsyncIterable):
-    """
-    Используется чтобы отправлять данные из PostgreSQL клиенту сразу после
-    получения, по частям, без буфферизации всех данных.
-    """
-    PREFETCH = 100
+@dataclass
+class TreeRecordsHolder:
+    records: AsyncGenerator
 
-    __slots__ = (
-        'query', 'transaction_ctx', 'prefetch', 'timeout', 'transform_record_func'
-    )
 
-    def __init__(self, query: Select,
-                 transaction_ctx: ConnectionTransactionContextManager,
-                 transform_record_func: Callable = None,
-                 prefetch: int = None,
-                 timeout: float = None):
-        self.query = query
-        self.transaction_ctx = transaction_ctx
-        self.transform_record_func = transform_record_func
-        self.prefetch = prefetch or self.PREFETCH
-        self.timeout = timeout
+async def select_query_async_gen(query: Select,
+                                 transaction_ctx: ConnectionTransactionContextManager,
+                                 transform: Callable[[Record], Any] = None,
+                                 prefetch: int = 100,
+                                 timeout: float = None):
 
-    async def __aiter__(self):
-        async with self.transaction_ctx as conn:
-            cursor = conn.cursor(self.query, prefetch=self.prefetch,
-                                 timeout=self.timeout)
-            async for row in cursor:
-                yield self.transform_record_func(row) if self.transform_record_func else row
+    async with transaction_ctx as conn:
+        cursor = conn.cursor(query, prefetch=prefetch, timeout=timeout)
+        async for rec in cursor:
+            yield transform(rec) if transform is not None else rec

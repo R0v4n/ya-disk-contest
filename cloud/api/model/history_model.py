@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from asyncpgsa import PG
 
 from .data_classes import ExportItem, ItemType
 from .query_builder import FileQuery
 
-from cloud.utils.pg import SelectQuery
+from cloud.utils.pg import select_query_async_gen
 
 
 class HistoryModel:
@@ -18,16 +18,13 @@ class HistoryModel:
         self.conn = pg
         self.date_end = date_end
 
-    async def get_files_updates_24h(self) -> list[dict[str, Any]]:
+    async def get_files_updates_24h(self) -> AsyncGenerator[dict[str, Any], Any]:
         date_start = self.date_end - timedelta(days=1)
 
         query = FileQuery.select_updates_daterange(date_start, self.date_end)
 
-        # res = await self.conn.fetch(query)
-
-        def transform(rec):
-            return ExportItem.construct(type=ItemType.FILE, **rec).dict(by_alias=True)
-
-        # nodes = [ExportItem.construct(type=ItemType.FILE, **rec).dict(by_alias=True) for rec in res]
-
-        return SelectQuery(query, self.conn.transaction(), transform)
+        return select_query_async_gen(
+            query,
+            self.conn.transaction(),
+            lambda rec: ExportItem.construct(type=ItemType.FILE, **rec).dict(by_alias=True)
+        )

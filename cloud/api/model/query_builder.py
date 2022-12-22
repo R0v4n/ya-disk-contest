@@ -203,21 +203,24 @@ class FolderQuery(QueryBase):
 
         return query
 
+    # todo: write query with SA
     @classmethod
     def get_node_select_query(cls, node_id: str):
         # return cls.select_folder_tree(node_id)
-        return f"""WITH RECURSIVE anon_1(id, parent_id, size, url, date, type) AS
+        return \
+            f"""WITH RECURSIVE anon_1(id, parent_id, size, url, date, type, path) AS
                    (SELECT folders.id        AS id,
                            folders.parent_id AS parent_id,
                            folders.size      AS size,
                            CAST(NULL as varchar)  AS url,
                            imports.date      AS date,
-                           'FOLDER'          AS type
+                           'FOLDER'          AS type,
+                           ARRAY[folders.id]
                     FROM folders
                              JOIN imports ON imports.id = folders.import_id
                     WHERE folders.id = '{node_id}'
                     UNION ALL
-                    select t.id, t.parent_id, t.size, t.url, t.date, t.type
+                    select t.id, t.parent_id, t.size, t.url, t.date, t.type, path || t.id
                     from (SELECT folders.id        AS id,
                                  folders.parent_id AS parent_id,
                                  folders.size      AS size,
@@ -236,9 +239,9 @@ class FolderQuery(QueryBase):
                           FROM files
                                    JOIN imports ON imports.id = files.import_id) as t
                              JOIN anon_1 ON t.parent_id = anon_1.id)
-
-SELECT anon_1.id, anon_1.parent_id, anon_1.size, anon_1.url, anon_1.date, anon_1.type
-FROM anon_1;"""
+                    
+                    SELECT anon_1.id, anon_1.parent_id as "parentId", anon_1.size, anon_1.url, anon_1.date, anon_1.type
+                    FROM anon_1 order by path;"""
 
     @classmethod
     def recursive_parents_with_size(cls, file_ids: Iterable[str] | str | None,
@@ -319,6 +322,6 @@ class FileQuery(QueryBase):
 
     @classmethod
     def get_node_select_query(cls, node_id: str):
-        columns = ['id', 'parent_id', 'url', 'size',
+        columns = ['id', cls.table.c.parent_id.label('parentId'), 'url', 'size',
                    literal_column(f"'{cls.node_type.value}'", String).label('type')]
         return cls.select_node_with_date(node_id, columns)
