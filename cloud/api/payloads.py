@@ -35,10 +35,6 @@ dumps = partial(json.dumps, default=convert, ensure_ascii=False)
 
 
 class JsonPayload(BaseJsonPayload):
-    """
-    Заменяет функцию сериализации на более "умную" (умеющую упаковывать в JSON
-    объекты asyncpg.Record и другие сущности).
-    """
 
     def __init__(self,
                  value: Any,
@@ -58,85 +54,44 @@ class JsonNodeTreeAsyncGenPayload(Payload):
                          *args, **kwargs)
 
     async def write(self, writer):
-        pr = partial(print, end='')
-        # pr = lambda *args: None
+        """
+        This method works strictly for ordered in depth folder tree records.
+        See get_node_select_query and https://postgrespro.ru/docs/postgresql/15/queries-with#QUERIES-WITH-RECURSIVE
+        """
         parents = deque()
-        opened = 0
-        first_children = True
+        is_first_child = True
         async for row in self._value.records:
-            start = True
+            # close previous parents if next node is outer
             while parents and row['parentId'] != parents[-1]:
                 parents.pop()
-                if not start:
-                    await writer.write(b',')
-                    pr(',')
-                else:
-                    start = False
                 await writer.write(b']}')
-                opened -= 1
-                pr(']}')
+                is_first_child = False
 
-            if not first_children:
+            # no need comma before first child in children list
+            if not is_first_child:
                 await writer.write(b',')
-                pr(',')
             else:
-                first_children = False
+                is_first_child = False
 
-            rec = dumps(row).encode(self._encoding)[:-1]
-            pr(dumps(row)[:-1])
-            await writer.write(rec)
+            # todo: better (more efficient?) way to do it (without slice probably)?
+            # write node record without "}"
+            await writer.write(dumps(row).encode(self._encoding)[:-1])
 
+            # write children field
             await writer.write(b', "children": ')
-            pr(', "children": ')
             if row['type'] == ItemType.FOLDER.value:
                 parents.append(row['id'])
-                opened += 1
-                first_children = True
+                is_first_child = True
                 await writer.write(b'[')
-                pr('[')
             else:
-                await writer.write(b'null')
-                pr('null')
-                await writer.write(b'}')
-                pr('}')
+                await writer.write(b'null}')
 
-        for _ in range(opened):
+        # close remaining parents
+        for _ in range(len(parents)):
             await writer.write(b']}')
-            pr(']}')
-
-        # await writer.write(b']}')
-        # pr(']}')
-
-        # async def write_node(parent_id):
-        #     nonlocal row
-        #     row = next(it)
-        #     if row['parent_id'] == parent_id or parent_id == sentinel:
-        #         rec = dumps(row).encode(self._encoding)[:-1]
-        #         print(rec)
-        #         await writer.write(rec)
-        #
-        #         await writer.write(b', "children": ')
-        #         print(', "children": ')
-        #         if row['type'] == ItemType.FOLDER.value:
-        #             await writer.write(b'[')
-        #             print('[')
-        #             for row in it:
-        #                 await write_node(row['id'])
-        #             await writer.write(b']')
-        #             print(']')
-        #         else:
-        #             await writer.write(b'null')
-        #             print('null')
-        #         await writer.write(b'}')
-        #         print('}')
-        # await write_node(sentinel)
 
 
 class AsyncGenJsonListPayload(Payload):
-    """
-    Итерируется по объектам AsyncIterable, частями сериализует данные из них
-    в JSON и отправляет клиенту.
-    """
 
     def __init__(self, value, encoding: str = 'utf-8',
                  content_type: str = 'application/json',
@@ -147,22 +102,20 @@ class AsyncGenJsonListPayload(Payload):
                          *args, **kwargs)
 
     async def write(self, writer):
-        # Начало объекта
         await writer.write(
             ('{"%s":[' % self.root_object).encode(self._encoding)
         )
 
-        first = True
-        async for row in self._value:
-            # Перед первой строчкой запятая не нужнаа
-            if not first:
+        try:
+            first_row = await anext(self._value)
+            await writer.write(dumps(first_row).encode(self._encoding))
+        except StopAsyncIteration:
+            pass
+        else:
+            async for row in self._value:
                 await writer.write(b',')
-            else:
-                first = False
+                await writer.write(dumps(row).encode(self._encoding))
 
-            await writer.write(dumps(row).encode(self._encoding))
-
-        # Конец объекта
         await writer.write(b']}')
 
 

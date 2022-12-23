@@ -90,7 +90,7 @@ class User(HttpUser):
     def get_node_history(self):
         ids = self.cloud.ids
         if ids:
-            node_id = choice(self.cloud.ids)
+            node_id = choice(ids)
 
             delta = self._last_import_date - self._date_start
 
