@@ -40,7 +40,7 @@ def expected_error_response(http_status_code: int):
     }
     return {
         'code': http_status_code,
-        'message': msg_dict[http_status_code]
+        'message': msg_dict.get(http_status_code, HTTPStatus(http_status_code).description)
     }
 
 

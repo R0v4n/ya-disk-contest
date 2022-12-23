@@ -1,7 +1,10 @@
 import json
 from datetime import datetime
 from functools import partial, singledispatch
+from typing import Any
 
+from aiohttp.payload import JsonPayload as BaseJsonPayload
+from aiohttp.typedefs import JSONEncoder
 from asyncpg import Record
 
 from cloud.api.model import ItemType
@@ -28,3 +31,18 @@ def convert_node_type_enum(value: ItemType):
 
 
 dumps = partial(json.dumps, default=convert, ensure_ascii=False)
+
+
+class JsonPayload(BaseJsonPayload):
+
+    def __init__(self,
+                 value: Any,
+                 encoding: str = 'utf-8',
+                 content_type: str = 'application/json',
+                 dumps: JSONEncoder = dumps,
+                 *args: Any,
+                 **kwargs: Any) -> None:
+        super().__init__(value, encoding, content_type, dumps, *args, **kwargs)
+
+
+__all__ = ('JsonPayload',)

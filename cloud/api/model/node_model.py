@@ -65,6 +65,6 @@ class NodeModel(BaseImportModel):
         query = self.query.select_nodes_union_history_in_daterange(date_start, date_end, self.node_id, closed=False)
 
         res = await self.conn.fetch(query)
-        nodes = [ExportItem(type=self.node_type, **rec).dict(by_alias=True) for rec in res]
+        nodes = [ExportItem.construct(type=self.node_type, **rec).dict(by_alias=True) for rec in res]
 
         return nodes

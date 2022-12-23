@@ -274,10 +274,10 @@ components:
         id:
           type: string
           nullable: false
-          description: Уникальный идентфикатор
+          description: Уникальный идентификатор
           example: "элемент_1_1"
         url:
-          description: Ссылка на файл. Для папок поле равнно null.
+          description: Ссылка на файл. Для папок поле равно null.
           type: string
           nullable: true
         date:
@@ -294,7 +294,7 @@ components:
         type:
           $ref: "#/components/schemas/SystemItemType"
         size:
-          description: Целое число, для папки - это суммарный размер всех элеметов.
+          description: Целое число, для папки - это суммарный размер всех элементов.
           type: integer
           nullable: true
           format: int64
@@ -339,10 +339,10 @@ components:
         id:
           type: string
           nullable: false
-          description: Уникальный идентфикатор
+          description: Уникальный идентификатор
           example: "элемент_1_1"
         url:
-          description: Ссылка на файл. Для папок поле равнно null.
+          description: Ссылка на файл. Для папок поле равно null.
           type: string
           nullable: true
         parentId:
@@ -388,10 +388,10 @@ components:
         id:
           type: string
           nullable: false
-          description: Уникальный идентфикатор
+          description: Уникальный идентификатор
           example: "элемент_1_1"
         url:
-          description: Ссылка на файл. Для папок поле равнно null.
+          description: Ссылка на файл. Для папок поле равно null.
           type: string
           nullable: true
         parentId:
