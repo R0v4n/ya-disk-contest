@@ -6,7 +6,7 @@ from aiohttp.web_middlewares import middleware
 from aiohttp.web_request import Request
 from aiohttp.web_response import json_response
 
-from .handlers.payloads import dumps
+from cloud.api.payloads import dumps
 from .model import ParentIdValidationError
 
 

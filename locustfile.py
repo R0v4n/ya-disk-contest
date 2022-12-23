@@ -9,9 +9,6 @@ from cloud.api.handlers import ImportsView, DeleteNodeView, NodeView, UpdatesVie
 from cloud.utils.testing import FakeCloudGen, url_for
 
 
-# from locust.exception import RescheduleTask
-
-
 class User(HttpUser):
     _last_import_date: datetime = datetime.now(timezone.utc)
     _date_start: datetime = _last_import_date
@@ -90,7 +87,7 @@ class User(HttpUser):
     def get_node_history(self):
         ids = self.cloud.ids
         if ids:
-            node_id = choice(self.cloud.ids)
+            node_id = choice(ids)
 
             delta = self._last_import_date - self._date_start
 
