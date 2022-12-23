@@ -23,6 +23,5 @@ class HistoryModel:
 
         res = await self.conn.fetch(query)
 
-        # todo: json payloads?
         nodes = [ExportItem.construct(type=ItemType.FILE, **rec).dict(by_alias=True) for rec in res]
         return nodes

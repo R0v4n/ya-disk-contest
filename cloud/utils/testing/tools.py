@@ -1,12 +1,10 @@
 from dataclasses import dataclass
-from typing import Iterable
 
 from deepdiff import DeepDiff
 from sqlalchemy.engine import Connection
 
 from cloud.api.model import ItemType
 from cloud.db.schema import imports_table, folders_table, files_table, folder_history, file_history
-from .api_methods import get_node
 from .fake_cloud import FakeCloud
 
 __all__ = (
@@ -15,7 +13,6 @@ __all__ = (
     'get_history_records',
     'get_node_records',
     'get_imports_records',
-    'compare_db_fc_node_trees',
     'compare_db_fc_state',
     'compare'
 )
@@ -103,18 +100,6 @@ def compare_db_fc_state(connection: Connection, fake_cloud: FakeCloud):
 
     compare(received_file_history, expected_file_history, 'file history!')
     compare(received_folder_history, expected_folder_history, 'folder history!')
-
-
-async def compare_db_fc_node_trees(api_client, fake_cloud: FakeCloud,
-                                   ids: Iterable[str] = None, nullify_folder_sizes=True):
-    if ids is None:
-        ids = fake_cloud.ids
-
-    for node_id in ids:
-        expected_tree = fake_cloud.get_tree(node_id, nullify_folder_sizes=nullify_folder_sizes)
-        received_tree = await get_node(api_client, node_id)
-
-        compare(received_tree, expected_tree)
 
 
 @dataclass

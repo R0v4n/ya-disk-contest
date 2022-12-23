@@ -23,5 +23,4 @@ def create_app(args: Settings) -> Application:
         logger.debug('Registering handler %r as %r', handler, handler.URL_PATH)
         app.router.add_route('*', handler.URL_PATH, handler)
 
-    # todo: payload_registry? do i need it? check alvassin project
     return app

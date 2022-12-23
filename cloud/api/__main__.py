@@ -15,7 +15,6 @@ from cloud.api.settings import default_settings, Settings
 
 
 # todo:
-#  -think about to change ids from string to int or uuid.
 #  -handle concurrent imports order somehow. queue is doing the job, but it is bad solution.
 #  -probably refactor to v 0.1.1 with more realistic imports and blocking only one folder branch in db.
 #  -Also in this case refactor history for folder

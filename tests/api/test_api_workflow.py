@@ -45,7 +45,6 @@ async def test(api_client, sync_connection):
                 if folder_ids:
                     node_id = choice(folder_ids)
                     received_tree = await get_node(api_client, node_id)
-                    debug(received_tree)
                     compare(received_tree, fake_cloud.get_tree(node_id))
 
                 # get node history:
