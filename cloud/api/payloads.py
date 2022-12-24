@@ -9,6 +9,7 @@ from asyncpg import Record
 from aiohttp.payload import JsonPayload as BaseJsonPayload, Payload
 
 from cloud.api.model import ItemType
+from cloud.utils.pg import NodeTreeAsyncGen
 
 
 @singledispatch
@@ -46,8 +47,8 @@ class JsonPayload(BaseJsonPayload):
         super().__init__(value, encoding, content_type, dumps, *args, **kwargs)
 
 
-class JsonNodeTreeAsyncGenPayload(Payload):
-    def __init__(self, value, encoding: str = 'utf-8',
+class AsyncGenJsonNodeTreePayload(Payload):
+    def __init__(self, value: NodeTreeAsyncGen, encoding: str = 'utf-8',
                  content_type: str = 'application/json',
                  *args, **kwargs):
         super().__init__(value, content_type=content_type, encoding=encoding,
@@ -56,11 +57,12 @@ class JsonNodeTreeAsyncGenPayload(Payload):
     async def write(self, writer):
         """
         This method works strictly for ordered in depth folder tree records.
-        See get_node_select_query and https://postgrespro.ru/docs/postgresql/15/queries-with#QUERIES-WITH-RECURSIVE
+        See FolderQuery.get_node_select_query
+        and https://postgrespro.com/docs/postgresql/15/queries-with#QUERIES-WITH-RECURSIVE (7.8.2.1. Search Order)
         """
         parents = deque()
         is_first_child = True
-        async for row in self._value.records:
+        async for row in self._value:
             # close previous parents if next node is outer
             while parents and row['parentId'] != parents[-1]:
                 parents.pop()
@@ -105,14 +107,14 @@ class AsyncGenJsonListPayload(Payload):
         await writer.write(
             ('{"%s":[' % self.root_object).encode(self._encoding)
         )
-
+        ait = aiter(self._value)
         try:
-            first_row = await anext(self._value)
+            first_row = await anext(ait)
             await writer.write(dumps(first_row).encode(self._encoding))
         except StopAsyncIteration:
             pass
         else:
-            async for row in self._value:
+            async for row in ait:
                 await writer.write(b',')
                 await writer.write(dumps(row).encode(self._encoding))
 
@@ -120,5 +122,5 @@ class AsyncGenJsonListPayload(Payload):
 
 
 __all__ = (
-    'JsonPayload', 'AsyncGenJsonListPayload', 'JsonNodeTreeAsyncGenPayload'
+    'JsonPayload', 'AsyncGenJsonListPayload', 'AsyncGenJsonNodeTreePayload'
 )

@@ -66,18 +66,35 @@ def make_alembic_config(cmd_opts: Namespace | SimpleNamespace, base_path: str | 
     return config
 
 
-@dataclass
-class TreeRecordsHolder:
-    records: AsyncGenerator
+class SelectAsyncGen(AsyncIterable):
+    """
+    Используется, чтобы отправлять данные из PostgreSQL клиенту сразу после
+    получения, по частям, без буфферизации всех данных.
+    """
+    PREFETCH = 1000
+
+    __slots__ = (
+        'query', 'transaction_ctx', 'prefetch', 'timeout', 'transform'
+    )
+
+    def __init__(self, query: Select,
+                 transaction_ctx: ConnectionTransactionContextManager,
+                 prefetch: int = None,
+                 timeout: float = None,
+                 transform: Callable[[Record], Any] = None):
+        self.query = query
+        self.transaction_ctx = transaction_ctx
+        self.prefetch = prefetch or self.PREFETCH
+        self.timeout = timeout
+        self.transform = transform
+
+    async def __aiter__(self):
+        async with self.transaction_ctx as conn:
+            cursor = conn.cursor(self.query, prefetch=self.prefetch,
+                                 timeout=self.timeout)
+            async for row in cursor:
+                yield self.transform(row) if self.transform is not None else row
 
 
-async def select_query_async_gen(query: Select,
-                                 transaction_ctx: ConnectionTransactionContextManager,
-                                 transform: Callable[[Record], Any] = None,
-                                 prefetch: int = 100,
-                                 timeout: float = None):
-
-    async with transaction_ctx as conn:
-        cursor = conn.cursor(query, prefetch=prefetch, timeout=timeout)
-        async for rec in cursor:
-            yield transform(rec) if transform is not None else rec
+class NodeTreeAsyncGen(SelectAsyncGen):
+    pass
