@@ -2,16 +2,15 @@ import os
 from sys import argv
 
 import forklib
-from setproctitle import setproctitle
 from aiohttp import web
 from aiomisc import bind_socket
 from aiomisc_log import basic_config
-from rich import print
+from setproctitle import setproctitle
 
 from cloud.api.app import create_app
-from cloud.utils.arguments_parse import clear_environ
-from cloud.utils.typer_meets_pydantic import typer_entry_point
 from cloud.api.settings import default_settings, Settings
+from cloud.utils.arguments_parse import clear_environ
+from cloud.utils.typer_meets_pydantic import TyperEntryPoint
 
 
 # todo:
@@ -21,12 +20,13 @@ from cloud.api.settings import default_settings, Settings
 #  -how to wait until db is ready?
 #  -run migrations from container
 #  -test faster json dump and load, uvloop
+#  -SA ORM
+#  -FastAPI
 
 
-@typer_entry_point(default_settings)
+@TyperEntryPoint(default_settings)
 def main(args: Settings):
     """It's alive!"""
-    print(args)
     clear_environ(lambda name: name.startswith(args.Config.env_prefix))
 
     basic_config(args.log_level.name, args.log_format.name)
