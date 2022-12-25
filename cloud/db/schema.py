@@ -25,7 +25,6 @@ convention = {
 }
 metadata = MetaData(naming_convention=convention)
 
-# todo: DRY!
 imports_table = Table(
     'imports',
     metadata,

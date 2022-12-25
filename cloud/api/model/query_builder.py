@@ -34,13 +34,6 @@ class QueryToolsMixin:
         if type(ids) == str:
             return table.c.id == ids
 
-        # todo: does it make sense?
-        if len(ids) == 1:
-            if isinstance(ids, set):
-                return table.c.id == ids.copy().pop()
-            if isinstance(ids, list):
-                return table.c.id == ids[0]
-
         return table.c.id.in_(ids)
 
 
@@ -57,7 +50,7 @@ class QueryBase(ABC, QueryToolsMixin):
         return select(columns).where(cls._ids_condition(cls.table, ids))
 
     @classmethod
-    def select_node_with_date(cls, node_id: str, columns: list[str | None] | None = None):
+    def select_node_with_date(cls, node_id: str, columns: list[str] | None = None):
         """
         Select node record with additional field date.
         """
