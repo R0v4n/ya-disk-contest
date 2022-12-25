@@ -1,9 +1,7 @@
 import os
 from enum import Enum
 
-from pydantic import PostgresDsn, IPvAnyAddress, conint
-
-from cloud.utils.typer_meets_pydantic import SettingsBase
+from pydantic import BaseModel, PostgresDsn, IPvAnyAddress, conint
 
 cpu_count = os.cpu_count() if os.name != 'nt' else 1
 
@@ -28,7 +26,7 @@ class LogFormat(str, Enum):
     rich_tb = 'rich_tb'
 
 
-class Settings(SettingsBase):
+class Settings(BaseModel):
     api_address: IPvAnyAddress = '0.0.0.0'
     api_port: conint(gt=0, lt=2 ** 16) = 8081
     api_workers_count: conint(gt=0, le=cpu_count) = cpu_count

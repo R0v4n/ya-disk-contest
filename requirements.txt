@@ -8,5 +8,6 @@ ConfigArgParse~=1.5.3
 typer[all]~=0.7.0
 aiomisc~=16.2.4
 aiohttp-pydantic~=1.12.2
+makefun~=1.15.0
 forklib
 setproctitle
