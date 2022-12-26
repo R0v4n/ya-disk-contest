@@ -60,7 +60,6 @@ async def test_updates(api_client, cloud, date):
 
     expected_updates = cloud.get_updates(date_end=date)
     received_updates = await get_updates(api_client, date)
-    print(received_updates)
     compare(received_updates, expected_updates)
 
 
