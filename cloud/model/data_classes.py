@@ -62,6 +62,10 @@ class ExportItem(Item):
     size: pdt.conint(ge=0)
 
 
+class ListExportItems(pdt.BaseModel):
+    items: list[ExportItem]
+
+
 class ImportData(pdt.BaseModel):
     items: list[ImportItem]
     date: datetime = pdt.Field(alias='updateDate')

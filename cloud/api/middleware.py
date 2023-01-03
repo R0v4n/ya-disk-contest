@@ -5,7 +5,7 @@ from aiohttp.web_exceptions import HTTPBadRequest, HTTPException, HTTPInternalSe
 from aiohttp.web_middlewares import middleware
 from aiohttp.web_request import Request
 
-from .model import ParentIdValidationError
+from cloud.model import ParentIdValidationError
 
 logger = logging.getLogger(__name__)
 

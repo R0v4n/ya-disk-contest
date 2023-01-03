@@ -3,9 +3,11 @@ from datetime import datetime
 from aiohttp.web_response import Response
 from aiohttp_pydantic.oas.typing import r200, r404, r400
 
+from cloud.model import (
+    ImportData, ImportModel, NodeModel, ExportNodeTree,
+    HistoryModel, Error, ListExportItems
+)
 from .base import BasePydanticView
-from ..model import ImportData, ImportModel, NodeModel, ExportNodeTree, HistoryModel, Error
-from ..model.data_classes import ExportItem
 
 
 class ImportsView(BasePydanticView):
@@ -64,7 +66,7 @@ class NodeView(BasePydanticView):
         """
         mdl = NodeModel(node_id)
         await mdl.init(self.pg)
-        node = await mdl.get_node()
+        node = (await mdl.get_node()).dict(by_alias=True)
         return Response(body=node)
 
 
@@ -96,7 +98,7 @@ class DeleteNodeView(BasePydanticView):
 class UpdatesView(BasePydanticView):
     URL_PATH = r'/updates'
 
-    async def get(self, date: datetime) -> r200[ExportItem] | r400[Error]:
+    async def get(self, date: datetime) -> r200[ListExportItems] | r400[Error]:
         """
         Получение списка файлов, которые были обновлены за последние 24 часа включительно [date - 24h, date]
         от времени переданном в запросе.
@@ -106,9 +108,9 @@ class UpdatesView(BasePydanticView):
             400: Невалидная схема документа или входные данные не верны
         """
         mdl = HistoryModel(self.pg, date)
-        nodes = await mdl.get_files_updates_24h()
+        items = await mdl.get_files_updates_24h()
 
-        return Response(body={'items': nodes})
+        return Response(body=items.dict(by_alias=True))
 
 
 class NodeHistoryView(BasePydanticView):
@@ -120,7 +122,7 @@ class NodeHistoryView(BasePydanticView):
             node_id: str, /,
             dateStart: datetime,
             dateEnd: datetime
-    ) -> r200[ExportItem] | r400[Error] | r404[Error]:
+    ) -> r200[ListExportItems] | r400[Error] | r404[Error]:
         """
         Получение истории обновлений по элементу за заданный полуинтервал [from, to).
         История по удаленным элементам недоступна.
@@ -132,6 +134,6 @@ class NodeHistoryView(BasePydanticView):
         """
         mdl = NodeModel(node_id)
         await mdl.init(self.pg)
-        nodes = await mdl.get_node_history(dateStart, dateEnd)
+        items = await mdl.get_node_history(dateStart, dateEnd)
 
-        return Response(body={'items': nodes})
+        return Response(body=items.dict(by_alias=True))

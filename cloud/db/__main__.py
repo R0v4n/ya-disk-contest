@@ -3,7 +3,7 @@ import argparse
 import os
 from alembic.config import CommandLine
 
-from cloud.api.settings import default_settings
+from cloud.settings import default_settings
 from cloud.utils.pg import make_alembic_config
 
 

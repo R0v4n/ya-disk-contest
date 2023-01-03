@@ -9,7 +9,7 @@ from uuid import UUID
 import faker
 import pydantic as pdt
 
-from cloud.api.model import ItemType
+from cloud.model import ItemType
 
 
 fake = faker.Faker(use_weighting=False)

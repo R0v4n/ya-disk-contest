@@ -5,7 +5,7 @@ from alembic.command import upgrade
 from sqlalchemy import create_engine
 
 from cloud.api.app import create_app
-from cloud.api.settings import Settings
+from cloud.settings import Settings
 
 
 @pytest.fixture

@@ -11,3 +11,6 @@ aiohttp-pydantic~=1.12.2
 makefun~=1.15.0
 forklib
 setproctitle
+fastapi
+uvicorn
+uvloop

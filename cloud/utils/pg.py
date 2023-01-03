@@ -8,7 +8,7 @@ from asyncpgsa import PG
 from configargparse import Namespace
 from yarl import URL
 
-from cloud.api.settings import Settings
+from cloud.settings import Settings
 
 
 CLOUD_PATH = Path(__file__).parent.parent.resolve()

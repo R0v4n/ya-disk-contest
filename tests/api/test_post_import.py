@@ -4,7 +4,7 @@ from http import HTTPStatus
 import pytest
 from pytest_cases import parametrize, fixture, AUTO, parametrize_with_cases
 
-from cloud.api.model import ItemType
+from cloud.model import ItemType
 from cloud.utils.testing import post_import, FakeCloud, compare_db_fc_state, Folder, File, Dataset
 from tests import post_import_cases
 

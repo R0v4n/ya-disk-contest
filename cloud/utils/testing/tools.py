@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from deepdiff import DeepDiff
 from sqlalchemy.engine import Connection
 
-from cloud.api.model import ItemType
+from cloud.model import ItemType
 from cloud.db.schema import imports_table, folders_table, files_table, folder_history, file_history
 from .fake_cloud import FakeCloud
 

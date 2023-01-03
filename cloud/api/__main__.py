@@ -8,7 +8,7 @@ from aiomisc_log import basic_config
 from setproctitle import setproctitle
 
 from cloud.api.app import create_app
-from cloud.api.settings import default_settings, Settings
+from cloud.settings import default_settings, Settings
 from cloud.utils.arguments_parse import clear_environ
 from cloud.utils.typer_meets_pydantic import TyperEntryPoint
 

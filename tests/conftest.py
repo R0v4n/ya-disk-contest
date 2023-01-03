@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy_utils import create_database, drop_database
 from yarl import URL
 
-from cloud.api.settings import default_settings
+from cloud.settings import default_settings
 from cloud.utils.pg import make_alembic_config
 from cloud.utils.testing import FakeCloud
 

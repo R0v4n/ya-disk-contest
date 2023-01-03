@@ -477,3 +477,14 @@ def case_move_folder3_in_folder2():
     ]
 
     return Dataset(import_dict=data, expected_history=history)
+
+
+datasets = [
+    case_folder1(),
+    case_folder2_with_two_files(),
+    case_folder3_with_two_files(),
+    case_new_file_in_folder3(),
+    case_update_file_in_folder2(),
+    case_move_file_from_folder2_to_folder3(),
+    case_move_folder3_in_folder2()
+]

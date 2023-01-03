@@ -10,7 +10,7 @@ from aiohttp_pydantic import oas
 from cloud.utils.pg import pg_context
 from .handlers import HANDLERS
 from .middleware import error_middleware
-from .settings import Settings
+from cloud.settings import Settings
 from .payloads import JsonPayload
 
 logger = logging.getLogger(__name__)

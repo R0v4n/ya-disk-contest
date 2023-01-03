@@ -3,7 +3,7 @@ from datetime import timedelta
 import pytest
 from pytest_cases import parametrize_with_cases, unpack_fixture
 
-from cloud.api.model import ItemType
+from cloud.model import ItemType
 from cloud.utils.testing import FakeCloud, Dataset, compare
 from tests import post_import_cases, get_node_cases
 

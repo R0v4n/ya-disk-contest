@@ -29,6 +29,7 @@ dynamic = ["dependencies", "optional-dependencies"]
 
 [project.scripts]
 cloud-api = "cloud.api.__main__:main"
+#cloud-fastapi = "cloud.api_fastapi.__main__:main"
 cloud-db = "cloud.db.__main__:main"
 
 
