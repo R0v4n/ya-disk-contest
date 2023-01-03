@@ -24,10 +24,9 @@ FROM snakepacker/python:3.10 as api
 # Копируем в него готовое виртуальное окружение из контейнера builder
 COPY --from=builder /usr/share/python3/app /usr/share/python3/app
 
-## Устанавливаем ссылки, чтобы можно было воспользоваться командами
-## приложения
-#RUN ln -snf /usr/share/python3/app/bin/cloud-* /usr/local/bin/
-WORKDIR /usr/share/python3/app
+# Устанавливаем ссылки, чтобы можно было воспользоваться командами
+# приложения
+RUN ln -snf /usr/share/python3/app/bin/cloud-* /usr/local/bin/
 
 # Устанавливаем выполняемую при запуске контейнера команду по умолчанию
-CMD ["/usr/share/python3/app/bin/uvicorn", "cloud.api_fastapi.__main__:app", "--workers", "8", "--host", "0.0.0.0", "--port", "8081", "--loop", "uvloop"]
+CMD ["cloud-fastapi"]

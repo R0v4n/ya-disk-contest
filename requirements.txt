@@ -13,4 +13,3 @@ forklib
 setproctitle
 fastapi
 uvicorn
-uvloop

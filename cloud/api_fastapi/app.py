@@ -3,7 +3,7 @@ from functools import partial
 from asyncpgsa import pg
 from fastapi import FastAPI
 
-from cloud.api_fastapi.routers import router
+from .routers import router
 from cloud.settings import Settings
 
 
@@ -23,11 +23,12 @@ async def shutdown_pg():
 
 
 def create_app(args: Settings):
-    app = FastAPI(docs_url='/')
+    app = FastAPI(
+        docs_url='/',
+        on_startup=[partial(startup_pg, args)],
+        on_shutdown=[shutdown_pg]
+    )
 
     app.include_router(router)
-
-    app.on_event('startup')(partial(startup_pg, args))
-    app.on_event('shutdown')(shutdown_pg)
 
     return app

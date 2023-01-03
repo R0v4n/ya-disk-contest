@@ -12,8 +12,8 @@ services:
 
   api:
     image: r0van/enrollment_autumn_2022
-#    command:
-#      - "cloud-fastapi"
+    command:
+      - "cloud-fastapi"
     ports:
       - "8081:8081"
     environment:
