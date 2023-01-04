@@ -4,8 +4,8 @@ from typing import Any
 from aiohttp.web_exceptions import HTTPNotFound, HTTPBadRequest
 
 from .base_model import BaseImportModel
-from .data_classes import ItemType, ExportItem, ListExportItems
-from .node_tree import ExportNodeTree
+from .data_classes import ItemType, ResponseItem, ListResponseItem
+from .node_tree import ResponseNodeTree
 from .query_builder import FileQuery, FolderQuery, Sign, QueryT
 
 
@@ -38,10 +38,10 @@ class NodeModel(BaseImportModel):
 
         raise HTTPNotFound()
 
-    async def get_node(self) -> ExportNodeTree:
+    async def get_node(self) -> ResponseNodeTree:
         res = await self.conn.fetch(self.query.get_node_select_query(self.node_id))
         # In general from_records returns a list[NodeTree]. In this case it will always be a single NodeTree list.
-        tree = ExportNodeTree.from_records(res)[0]
+        tree = ResponseNodeTree.from_records(res)[0]
         return tree
 
     async def execute_delete_node(self):
@@ -57,7 +57,7 @@ class NodeModel(BaseImportModel):
         await self.conn.execute(update_q)
         await self.conn.execute(self.query.delete(self.node_id))
 
-    async def get_node_history(self, date_start: datetime, date_end: datetime) -> ListExportItems:
+    async def get_node_history(self, date_start: datetime, date_end: datetime) -> ListResponseItem:
 
         if date_start >= date_end or date_end.tzinfo is None or date_start.tzinfo is None:
             raise HTTPBadRequest
@@ -65,5 +65,5 @@ class NodeModel(BaseImportModel):
         query = self.query.select_nodes_union_history_in_daterange(date_start, date_end, self.node_id, closed=False)
 
         res = await self.conn.fetch(query)
-        items = ListExportItems(items=[{'type': self.node_type, **rec} for rec in res])
+        items = ListResponseItem(items=[{'type': self.node_type, **rec} for rec in res])
         return items

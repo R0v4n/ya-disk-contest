@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Iterable, Mapping, Any, TypeVar
 
-from .data_classes import ImportItem, ItemType, ExportItem, Item
+from .data_classes import RequestItem, ItemType, ResponseItem, Item
 
 
 # todo: how to deal with type hints here?
@@ -45,12 +45,12 @@ class TreeMixin(ABC):
         return top_nodes
 
 
-class ExportNodeTree(ExportItem, TreeMixin):
-    children: list[ExportNodeTree] | None = None
+class ResponseNodeTree(ResponseItem, TreeMixin):
+    children: list[ResponseNodeTree] | None = None
 
 
-class ImportNodeTree(ImportItem, TreeMixin):
-    children: list[ImportNodeTree] | None = None
+class RequestNodeTree(RequestItem, TreeMixin):
+    children: list[RequestNodeTree] | None = None
 
     def flatten_nodes_dict_gen(self, import_id: int):
         """
@@ -59,7 +59,7 @@ class ImportNodeTree(ImportItem, TreeMixin):
         Any child always will be after his parent.
         """
 
-        def get_dict(node: ImportNodeTree):
+        def get_dict(node: RequestNodeTree):
             yield node.db_dict(import_id)
             if node.children:
                 for child in node.children:
@@ -68,5 +68,5 @@ class ImportNodeTree(ImportItem, TreeMixin):
         return get_dict(self)
 
 
-TreeT = TypeVar('TreeT', ExportNodeTree, ImportNodeTree)
+TreeT = TypeVar('TreeT', ResponseNodeTree, RequestNodeTree)
 

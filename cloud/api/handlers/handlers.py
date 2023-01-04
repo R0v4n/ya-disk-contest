@@ -4,8 +4,8 @@ from aiohttp.web_response import Response
 from aiohttp_pydantic.oas.typing import r200, r404, r400
 
 from cloud.model import (
-    ImportData, ImportModel, NodeModel, ExportNodeTree,
-    HistoryModel, Error, ListExportItems
+    RequestImport, ImportModel, NodeModel, ResponseNodeTree,
+    HistoryModel, Error, ListResponseItem
 )
 from .base import BasePydanticView
 
@@ -14,7 +14,7 @@ class ImportsView(BasePydanticView):
     URL_PATH = '/imports'
     ModelT = ImportModel
 
-    async def post(self, data: ImportData) -> r200 | r400[Error]:
+    async def post(self, data: RequestImport) -> r200 | r400[Error]:
         """
         Импортирует элементы файловой системы. Элементы импортированные повторно обновляют текущие.
         Изменение типа элемента с папки на файл и с файла на папку не допускается.
@@ -54,7 +54,7 @@ class ImportsView(BasePydanticView):
 class NodeView(BasePydanticView):
     URL_PATH = r'/nodes/{node_id}'
 
-    async def get(self, node_id: str, /) -> r200[ExportNodeTree] | r404[Error] | r400[Error]:
+    async def get(self, node_id: str, /) -> r200[ResponseNodeTree] | r404[Error] | r400[Error]:
         """
         Получить информацию об элементе по идентификатору.
         При получении информации о папке также предоставляется информация о её дочерних элементах.
@@ -98,7 +98,7 @@ class DeleteNodeView(BasePydanticView):
 class UpdatesView(BasePydanticView):
     URL_PATH = r'/updates'
 
-    async def get(self, date: datetime) -> r200[ListExportItems] | r400[Error]:
+    async def get(self, date: datetime) -> r200[ListResponseItem] | r400[Error]:
         """
         Получение списка файлов, которые были обновлены за последние 24 часа включительно [date - 24h, date]
         от времени переданном в запросе.
@@ -122,7 +122,7 @@ class NodeHistoryView(BasePydanticView):
             node_id: str, /,
             dateStart: datetime,
             dateEnd: datetime
-    ) -> r200[ListExportItems] | r400[Error] | r404[Error]:
+    ) -> r200[ListResponseItem] | r400[Error] | r404[Error]:
         """
         Получение истории обновлений по элементу за заданный полуинтервал [from, to).
         История по удаленным элементам недоступна.

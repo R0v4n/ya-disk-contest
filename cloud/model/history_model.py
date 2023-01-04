@@ -1,9 +1,8 @@
 from datetime import datetime, timedelta
-from typing import Any
 
 from asyncpgsa import PG
 
-from .data_classes import ExportItem, ItemType, ListExportItems
+from .data_classes import ItemType, ListResponseItem
 from .query_builder import FileQuery
 
 
@@ -14,12 +13,12 @@ class HistoryModel:
         self.conn = pg
         self.date_end = date_end
 
-    async def get_files_updates_24h(self) -> ListExportItems:
+    async def get_files_updates_24h(self) -> ListResponseItem:
         date_start = self.date_end - timedelta(days=1)
 
         query = FileQuery.select_updates_daterange(date_start, self.date_end)
 
         res = await self.conn.fetch(query)
 
-        items = ListExportItems(items=[{'type': ItemType.FILE, **rec} for rec in res])
+        items = ListResponseItem(items=[{'type': ItemType.FILE, **rec} for rec in res])
         return items

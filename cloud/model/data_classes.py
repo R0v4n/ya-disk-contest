@@ -27,7 +27,7 @@ class Item(pdt.BaseModel):
         allow_population_by_field_name = True
 
 
-class ImportItem(Item):
+class RequestItem(Item):
     class Config:
         FOLDER_DB_FIELDS = {'id', 'parent_id'}
         FILE_DB_FIELDS = {'id', 'parent_id', 'url', 'size'}
@@ -57,17 +57,17 @@ class ImportItem(Item):
         return cls.Config.FOLDER_DB_FIELDS if node_type == ItemType.FOLDER else cls.Config.FILE_DB_FIELDS
 
 
-class ExportItem(Item):
+class ResponseItem(Item):
     date: datetime
     size: pdt.conint(ge=0)
 
 
-class ListExportItems(pdt.BaseModel):
-    items: list[ExportItem]
+class ListResponseItem(pdt.BaseModel):
+    items: list[ResponseItem]
 
 
-class ImportData(pdt.BaseModel):
-    items: list[ImportItem]
+class RequestImport(pdt.BaseModel):
+    items: list[RequestItem]
     date: datetime = pdt.Field(alias='updateDate')
 
     class Config:

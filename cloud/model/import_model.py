@@ -7,8 +7,8 @@ from asyncpg import ForeignKeyViolationError
 from asyncpgsa.connection import SAConnection
 
 from .base_model import BaseImportModel
-from .data_classes import ImportData, ItemType, ImportItem, ParentIdValidationError
-from .node_tree import ImportNodeTree
+from .data_classes import RequestImport, ItemType, RequestItem, ParentIdValidationError
+from .node_tree import RequestNodeTree
 from .query_builder import FileQuery, FolderQuery, QueryT, Sign
 
 
@@ -17,7 +17,7 @@ class ImportModel(BaseImportModel):
 
     __slots__ = ('data', 'files_mdl', 'folders_mdl')
 
-    def __init__(self, data: ImportData):
+    def __init__(self, data: RequestImport):
 
         self.data = data
         super().__init__(data.date)
@@ -95,7 +95,7 @@ class NodeListBaseModel(ABC):
     __slots__ = ('import_id', 'conn', 'date', 'nodes', 'ids',
                  '_new_ids', '_existent_ids', '_existent_parent_ids')
 
-    def __init__(self, data: ImportData, import_id: int,
+    def __init__(self, data: RequestImport, import_id: int,
                  conn: SAConnection):
         self.import_id = import_id
         self.conn = conn
@@ -150,7 +150,7 @@ class NodeListBaseModel(ABC):
         if self.existent_ids:
             mapping = {
                 key: f'${i}'
-                for i, key in enumerate(ImportItem.db_fields_set(self.NodeT) | {'import_id'}, start=1)
+                for i, key in enumerate(RequestItem.db_fields_set(self.NodeT) | {'import_id'}, start=1)
             }
 
             rows = [
@@ -200,7 +200,7 @@ class FolderListModel(NodeListBaseModel):
     def _get_new_nodes_records(self):
         new_folders = (node for node in self.nodes if node.id in self.new_ids)
 
-        folder_trees = ImportNodeTree.from_nodes(new_folders)
+        folder_trees = RequestNodeTree.from_nodes(new_folders)
 
         ordered_folders = sum((list(tree.flatten_nodes_dict_gen(self.import_id)) for tree in folder_trees), [])
 
