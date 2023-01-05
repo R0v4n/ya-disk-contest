@@ -7,7 +7,7 @@ from aiohttp.web_app import Application
 from aiohttp import PAYLOAD_REGISTRY
 from aiohttp_pydantic import oas
 
-from cloud.utils.pg import pg_context
+from .cleanup_ctx import pg_context
 from .handlers import HANDLERS
 from .middleware import error_middleware
 from cloud.settings import Settings
