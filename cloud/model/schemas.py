@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import datetime
 from enum import Enum
 
@@ -73,6 +71,7 @@ class RequestImport(pdt.BaseModel):
     class Config:
         extra = Extra.forbid
 
+    # noinspection PyMethodParameters
     @pdt.validator('items')
     def check_unique(cls, items):
         if len(items) > len({item.id for item in items}):

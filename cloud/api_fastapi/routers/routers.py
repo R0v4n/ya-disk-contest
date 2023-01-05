@@ -29,7 +29,7 @@ async def imports(mdl: model.ImportModel = Depends(), pg: PG = Depends(get_pg)):
         status.HTTP_404_NOT_FOUND: {'model': model.Error},
     }
 )
-async def delete_node(mdl: model.NodeModel = Depends(), pg: PG = Depends(get_pg)):
+async def delete_node(mdl: model.NodeImportModel = Depends(), pg: PG = Depends(get_pg)):
     async with pg.transaction() as conn:
         await mdl.init(conn)
         await mdl.execute_delete_node()
@@ -43,9 +43,9 @@ async def node_tree(mdl: model.NodeModel = Depends(), pg: PG = Depends(get_pg)):
 
 
 @router.get('/updates', response_model=model.ListResponseItem)
-async def updates(date: datetime, pg: PG = Depends(get_pg)):
-    mdl = model.HistoryModel(pg, date)
-    return await mdl.get_files_updates_24h()
+async def updates(mdl: model.HistoryModel = Depends(), pg: PG = Depends(get_pg)):
+    await mdl.init(pg)
+    return await mdl.get_files_updates()
 
 
 # noinspection PyPep8Naming

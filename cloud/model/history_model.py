@@ -1,20 +1,19 @@
 from datetime import datetime, timedelta
 
-from asyncpgsa import PG
-
-from .data_classes import ItemType, ListResponseItem
+from .base import BaseModel
+from .schemas import ItemType, ListResponseItem
 from .query_builder import FileQuery
 
 
-class HistoryModel:
-    __slots__ = ('conn', 'date_end')
+class HistoryModel(BaseModel):
+    __slots__ = ('date_end',)
 
-    def __init__(self, pg: PG, date_end: datetime):
-        self.conn = pg
-        self.date_end = date_end
+    def __init__(self, date: datetime):
+        super().__init__()
+        self.date_end = date
 
-    async def get_files_updates_24h(self) -> ListResponseItem:
-        date_start = self.date_end - timedelta(days=1)
+    async def get_files_updates(self, days: int = 1) -> ListResponseItem:
+        date_start = self.date_end - timedelta(days=days)
 
         query = FileQuery.select_updates_daterange(date_start, self.date_end)
 

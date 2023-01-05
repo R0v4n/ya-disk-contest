@@ -10,20 +10,12 @@ class NotInitializedError(Exception):
     pass
 
 
-class BaseImportModel:
+class BaseModel:
 
-    __slots__ = ('_date', '_import_id', '_conn')
+    __slots__ = ('_conn',)
 
-    def __init__(self, date: datetime | None):
-        # todo: date is None for NodeModel instantiated for GET node and GET node history.
-        #  This is anti SOLID. Need refactor NodeModel (separate get methods probably)
-        if date is not None and date.tzinfo is None:
-            raise HTTPBadRequest
-
-        self._date = date
-
+    def __init__(self, *args):
         self._conn = None
-        self._import_id = None
 
     async def init(self, connection):
         self._conn = connection
@@ -31,8 +23,21 @@ class BaseImportModel:
     @property
     def conn(self) -> SAConnection:
         if self._conn is None:
-            raise NotInitializedError(f'{self.__class__.__name__} init() needs to be called first.')
+            raise NotInitializedError(f'{self.__class__.__name__}.init needs to be called first.')
         return self._conn
+
+
+class BaseImportModel(BaseModel):
+
+    __slots__ = ('_date', '_import_id')
+
+    def __init__(self, date: datetime, *args):
+        super().__init__(*args)
+        if date.tzinfo is None:
+            raise HTTPBadRequest
+
+        self._date = date
+        self._import_id = None
 
     @property
     def date(self) -> datetime:

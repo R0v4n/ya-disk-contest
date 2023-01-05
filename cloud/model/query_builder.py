@@ -7,7 +7,7 @@ from sqlalchemy import Table, select, func, exists, literal_column, String
 from sqlalchemy.sql.elements import Null
 
 from cloud.db.schema import files_table, folder_history, folders_table, file_history, imports_table
-from .data_classes import ItemType
+from .schemas import ItemType
 
 
 class Sign(IntEnum):

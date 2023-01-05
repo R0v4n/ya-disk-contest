@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Iterable, Mapping, Any, TypeVar
 
-from .data_classes import RequestItem, ItemType, ResponseItem, Item
+from .schemas import RequestItem, ItemType, ResponseItem, Item
 
 
 # todo: how to deal with type hints here?

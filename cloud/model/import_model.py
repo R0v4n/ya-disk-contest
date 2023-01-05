@@ -6,8 +6,8 @@ from aiohttp.web_exceptions import HTTPBadRequest
 from asyncpg import ForeignKeyViolationError
 from asyncpgsa.connection import SAConnection
 
-from .base_model import BaseImportModel
-from .data_classes import RequestImport, ItemType, RequestItem, ParentIdValidationError
+from .base import BaseImportModel
+from .schemas import RequestImport, ItemType, RequestItem, ParentIdValidationError
 from .node_tree import RequestNodeTree
 from .query_builder import FileQuery, FolderQuery, QueryT, Sign
 

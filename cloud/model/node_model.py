@@ -1,21 +1,17 @@
 from datetime import datetime
-from typing import Any
 
 from aiohttp.web_exceptions import HTTPNotFound, HTTPBadRequest
 
-from .base_model import BaseImportModel
-from .data_classes import ItemType, ResponseItem, ListResponseItem
+from .base import BaseImportModel, BaseModel
+from .schemas import ItemType, ListResponseItem
 from .node_tree import ResponseNodeTree
 from .query_builder import FileQuery, FolderQuery, Sign, QueryT
 
 
-class NodeModel(BaseImportModel):
+class NodeBaseModel(BaseModel):
 
-    __slots__ = ('node_id', '_query', '_node_type')
-
-    def __init__(self, node_id: str, date: datetime | None = None):
-
-        super().__init__(date)
+    def __init__(self, node_id: str, *args):
+        super().__init__(*args)
         self.node_id = node_id
         self._query = None
         self._node_type = None
@@ -38,11 +34,38 @@ class NodeModel(BaseImportModel):
 
         raise HTTPNotFound()
 
+
+class NodeModel(NodeBaseModel):
+
+    __slots__ = ('node_id', '_query', '_node_type')
+
+    def __init__(self, node_id: str):
+        super().__init__(node_id)
+
     async def get_node(self) -> ResponseNodeTree:
         res = await self.conn.fetch(self.query.get_node_select_query(self.node_id))
         # In general from_records returns a list[NodeTree]. In this case it will always be a single NodeTree list.
         tree = ResponseNodeTree.from_records(res)[0]
         return tree
+
+    async def get_node_history(self, date_start: datetime, date_end: datetime) -> ListResponseItem:
+        if date_start >= date_end or date_end.tzinfo is None or date_start.tzinfo is None:
+            raise HTTPBadRequest
+
+        query = self.query.select_nodes_union_history_in_daterange(
+            date_start, date_end, self.node_id, closed=False)
+
+        res = await self.conn.fetch(query)
+        items = ListResponseItem(items=[{'type': self.node_type, **rec} for rec in res])
+        return items
+
+
+class NodeImportModel(BaseImportModel, NodeBaseModel):
+
+    __slots__ = ('node_id', '_query', '_node_type')
+
+    def __init__(self, node_id: str, date: datetime):
+        super().__init__(date, node_id)
 
     async def execute_delete_node(self):
         await self.insert_import()
@@ -56,14 +79,3 @@ class NodeModel(BaseImportModel):
         await self.conn.execute(history_q)
         await self.conn.execute(update_q)
         await self.conn.execute(self.query.delete(self.node_id))
-
-    async def get_node_history(self, date_start: datetime, date_end: datetime) -> ListResponseItem:
-
-        if date_start >= date_end or date_end.tzinfo is None or date_start.tzinfo is None:
-            raise HTTPBadRequest
-
-        query = self.query.select_nodes_union_history_in_daterange(date_start, date_end, self.node_id, closed=False)
-
-        res = await self.conn.fetch(query)
-        items = ListResponseItem(items=[{'type': self.node_type, **rec} for rec in res])
-        return items

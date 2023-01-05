@@ -3,18 +3,15 @@ from datetime import datetime
 from aiohttp.web_response import Response
 from aiohttp_pydantic.oas.typing import r200, r404, r400
 
-from cloud.model import (
-    RequestImport, ImportModel, NodeModel, ResponseNodeTree,
-    HistoryModel, Error, ListResponseItem
-)
+from cloud import model
 from .base import BasePydanticView
 
 
 class ImportsView(BasePydanticView):
     URL_PATH = '/imports'
-    ModelT = ImportModel
+    ModelT = model.ImportModel
 
-    async def post(self, data: RequestImport) -> r200 | r400[Error]:
+    async def post(self, data: model.RequestImport) -> r200 | r400[model.Error]:
         """
         Импортирует элементы файловой системы. Элементы импортированные повторно обновляют текущие.
         Изменение типа элемента с папки на файл и с файла на папку не допускается.
@@ -54,7 +51,7 @@ class ImportsView(BasePydanticView):
 class NodeView(BasePydanticView):
     URL_PATH = r'/nodes/{node_id}'
 
-    async def get(self, node_id: str, /) -> r200[ResponseNodeTree] | r404[Error] | r400[Error]:
+    async def get(self, node_id: str, /) -> r200[model.ResponseNodeTree] | r404[model.Error] | r400[model.Error]:
         """
         Получить информацию об элементе по идентификатору.
         При получении информации о папке также предоставляется информация о её дочерних элементах.
@@ -64,7 +61,7 @@ class NodeView(BasePydanticView):
             400: Невалидная схема документа или входные данные не верны.
             404: Элемент не найден.
         """
-        mdl = NodeModel(node_id)
+        mdl = model.NodeModel(node_id)
         await mdl.init(self.pg)
         node = (await mdl.get_node()).dict(by_alias=True)
         return Response(body=node)
@@ -72,13 +69,13 @@ class NodeView(BasePydanticView):
 
 class DeleteNodeView(BasePydanticView):
     URL_PATH = r'/delete/{node_id}'
-    ModelT = NodeModel
+    ModelT = model.NodeImportModel
 
     async def delete(
             self,
             node_id: str, /,
             date: datetime
-    ) -> r200 | r404[Error] | r400[Error]:
+    ) -> r200 | r404[model.Error] | r400[model.Error]:
         """
         Удалить элемент по идентификатору. При удалении папки удаляются все дочерние элементы.
         Доступ к истории обновлений удаленного элемента невозможен.
@@ -98,7 +95,7 @@ class DeleteNodeView(BasePydanticView):
 class UpdatesView(BasePydanticView):
     URL_PATH = r'/updates'
 
-    async def get(self, date: datetime) -> r200[ListResponseItem] | r400[Error]:
+    async def get(self, date: datetime) -> r200[model.ListResponseItem] | r400[model.Error]:
         """
         Получение списка файлов, которые были обновлены за последние 24 часа включительно [date - 24h, date]
         от времени переданном в запросе.
@@ -107,8 +104,9 @@ class UpdatesView(BasePydanticView):
             200: Список элементов, которые были обновлены.
             400: Невалидная схема документа или входные данные не верны
         """
-        mdl = HistoryModel(self.pg, date)
-        items = await mdl.get_files_updates_24h()
+        mdl = model.HistoryModel(date)
+        await mdl.init(self.pg)
+        items = await mdl.get_files_updates()
 
         return Response(body=items.dict(by_alias=True))
 
@@ -122,7 +120,7 @@ class NodeHistoryView(BasePydanticView):
             node_id: str, /,
             dateStart: datetime,
             dateEnd: datetime
-    ) -> r200[ListResponseItem] | r400[Error] | r404[Error]:
+    ) -> r200[model.ListResponseItem] | r400[model.Error] | r404[model.Error]:
         """
         Получение истории обновлений по элементу за заданный полуинтервал [from, to).
         История по удаленным элементам недоступна.
@@ -132,7 +130,7 @@ class NodeHistoryView(BasePydanticView):
             400: Невалидная схема документа или входные данные не верны.
             404: Элемент не найден.
         """
-        mdl = NodeModel(node_id)
+        mdl = model.NodeModel(node_id)
         await mdl.init(self.pg)
         items = await mdl.get_node_history(dateStart, dateEnd)
 
