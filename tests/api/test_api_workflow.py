@@ -1,6 +1,7 @@
 from datetime import timedelta
 from random import randint, shuffle, choice, uniform
 
+import pytest
 from devtools import debug
 
 from cloud.utils.testing import (
@@ -9,6 +10,7 @@ from cloud.utils.testing import (
 )
 
 
+@pytest.mark.slow
 async def test(api_client, sync_connection):
     fake_cloud = FakeCloudGen()
 

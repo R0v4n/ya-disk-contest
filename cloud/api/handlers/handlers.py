@@ -4,11 +4,12 @@ from aiohttp.web_response import Response
 from aiohttp_pydantic.oas.typing import r200, r404, r400
 
 from cloud import model
+from cloud.resources import url_paths
 from .base import BasePydanticView
 
 
 class ImportsView(BasePydanticView):
-    URL_PATH = '/imports'
+    URL_PATH = url_paths.IMPORTS
     ModelT = model.ImportModel
 
     async def post(self, data: model.RequestImport) -> r200 | r400[model.Error]:
@@ -49,7 +50,7 @@ class ImportsView(BasePydanticView):
 
 
 class NodeView(BasePydanticView):
-    URL_PATH = r'/nodes/{node_id}'
+    URL_PATH = url_paths.GET_NODE
 
     async def get(self, node_id: str, /) -> r200[model.ResponseNodeTree] | r404[model.Error] | r400[model.Error]:
         """
@@ -68,7 +69,7 @@ class NodeView(BasePydanticView):
 
 
 class DeleteNodeView(BasePydanticView):
-    URL_PATH = r'/delete/{node_id}'
+    URL_PATH = url_paths.DELETE_NODE
     ModelT = model.NodeImportModel
 
     async def delete(
@@ -93,7 +94,7 @@ class DeleteNodeView(BasePydanticView):
 
 
 class UpdatesView(BasePydanticView):
-    URL_PATH = r'/updates'
+    URL_PATH = url_paths.GET_UPDATES
 
     async def get(self, date: datetime) -> r200[model.ListResponseItem] | r400[model.Error]:
         """
@@ -112,7 +113,7 @@ class UpdatesView(BasePydanticView):
 
 
 class NodeHistoryView(BasePydanticView):
-    URL_PATH = r'/node/{node_id}/history'
+    URL_PATH = url_paths.GET_NODE_HISTORY
 
     # noinspection PyPep8Naming
     async def get(

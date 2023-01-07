@@ -5,6 +5,7 @@ from fastapi import APIRouter, status, Request, Depends
 from fastapi.responses import Response
 
 from cloud import model
+from cloud.resources import url_paths
 
 router = APIRouter(
     responses={
@@ -23,7 +24,7 @@ def get_pg(request: Request) -> PG:
     return request.app.state.pg
 
 
-@router.post('/imports', response_class=Response)
+@router.post(url_paths.IMPORTS, response_class=Response)
 async def imports(mdl: model.ImportModel = Depends(), pg: PG = Depends(get_pg)):
     async with pg.transaction() as conn:
         await mdl.init(conn)
@@ -33,7 +34,7 @@ async def imports(mdl: model.ImportModel = Depends(), pg: PG = Depends(get_pg)):
 
 
 @node_router.delete(
-    '/delete/{node_id}',
+    url_paths.DELETE_NODE,
     response_class=Response,
 )
 async def delete_node(mdl: model.NodeImportModel = Depends(), pg: PG = Depends(get_pg)):
@@ -44,20 +45,20 @@ async def delete_node(mdl: model.NodeImportModel = Depends(), pg: PG = Depends(g
     return Response()
 
 
-@node_router.get('/nodes/{node_id}', response_model=model.ResponseNodeTree)
+@node_router.get(url_paths.GET_NODE, response_model=model.ResponseNodeTree)
 async def node_tree(mdl: model.NodeModel = Depends(), pg: PG = Depends(get_pg)):
     await mdl.init(pg)
     return await mdl.get_node()
 
 
-@router.get('/updates', response_model=model.ListResponseItem)
+@router.get(url_paths.GET_UPDATES, response_model=model.ListResponseItem)
 async def updates(mdl: model.HistoryModel = Depends(), pg: PG = Depends(get_pg)):
     await mdl.init(pg)
     return await mdl.get_files_updates()
 
 
 # noinspection PyPep8Naming
-@node_router.get('/node/{node_id}/history', response_model=model.ListResponseItem)
+@node_router.get(url_paths.GET_NODE_HISTORY, response_model=model.ListResponseItem)
 async def node_history(
         dateStart: datetime,
         dateEnd: datetime,

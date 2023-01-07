@@ -51,7 +51,7 @@ def case_folder2_with_two_files():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-01 12:00:00+00:00',
+            'date': '2022-02-01T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 0,
@@ -93,7 +93,7 @@ def case_folder3_with_two_files():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-01 12:00:00+00:00',
+            'date': '2022-02-01T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 0,
@@ -101,7 +101,7 @@ def case_folder3_with_two_files():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-02 12:00:00+00:00',
+            'date': '2022-02-02T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 384,
@@ -129,7 +129,7 @@ def case_new_file_in_folder3():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-01 12:00:00+00:00',
+            'date': '2022-02-01T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 0,
@@ -137,7 +137,7 @@ def case_new_file_in_folder3():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-02 12:00:00+00:00',
+            'date': '2022-02-02T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 384,
@@ -145,7 +145,7 @@ def case_new_file_in_folder3():
         {
             'id': '1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2',
             'parentId': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-            'date': '2022-02-03 12:00:00+00:00',
+            'date': '2022-02-03T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1536,
@@ -153,7 +153,7 @@ def case_new_file_in_folder3():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-03 12:00:00+00:00',
+            'date': '2022-02-03T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1920,
@@ -181,7 +181,7 @@ def case_update_file_in_folder2():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-01 12:00:00+00:00',
+            'date': '2022-02-01T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 0,
@@ -189,7 +189,7 @@ def case_update_file_in_folder2():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-02 12:00:00+00:00',
+            'date': '2022-02-02T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 384,
@@ -197,7 +197,7 @@ def case_update_file_in_folder2():
         {
             'id': '1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2',
             'parentId': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-            'date': '2022-02-03 12:00:00+00:00',
+            'date': '2022-02-03T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1536,
@@ -205,7 +205,7 @@ def case_update_file_in_folder2():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-03 12:00:00+00:00',
+            'date': '2022-02-03T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1920,
@@ -213,7 +213,7 @@ def case_update_file_in_folder2():
         {
             'id': 'd515e43f-f3f6-4471-bb77-6b455017a2d2',
             'parentId': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-            'date': '2022-02-02 12:00:00+00:00',
+            'date': '2022-02-02T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 384,
@@ -221,7 +221,7 @@ def case_update_file_in_folder2():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-03 15:00:00+00:00',
+            'date': '2022-02-03T15:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1984,
@@ -229,7 +229,7 @@ def case_update_file_in_folder2():
         {
             'id': '863e1a7a-1304-42ae-943b-179184c077e3',
             'parentId': 'd515e43f-f3f6-4471-bb77-6b455017a2d2',
-            'date': '2022-02-02 12:00:00+00:00',
+            'date': '2022-02-02T12:00:00+00:00',
             'type': 'FILE',
             'url': '/file/url1',
             'size': 128,
@@ -257,7 +257,7 @@ def case_move_file_from_folder2_to_folder3():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-01 12:00:00+00:00',
+            'date': '2022-02-01T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 0,
@@ -265,7 +265,7 @@ def case_move_file_from_folder2_to_folder3():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-02 12:00:00+00:00',
+            'date': '2022-02-02T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 384,
@@ -273,7 +273,7 @@ def case_move_file_from_folder2_to_folder3():
         {
             'id': '1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2',
             'parentId': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-            'date': '2022-02-03 12:00:00+00:00',
+            'date': '2022-02-03T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1536,
@@ -281,7 +281,7 @@ def case_move_file_from_folder2_to_folder3():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-03 12:00:00+00:00',
+            'date': '2022-02-03T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1920,
@@ -289,7 +289,7 @@ def case_move_file_from_folder2_to_folder3():
         {
             'id': 'd515e43f-f3f6-4471-bb77-6b455017a2d2',
             'parentId': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-            'date': '2022-02-02 12:00:00+00:00',
+            'date': '2022-02-02T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 384,
@@ -297,7 +297,7 @@ def case_move_file_from_folder2_to_folder3():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-03 15:00:00+00:00',
+            'date': '2022-02-03T15:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1984,
@@ -305,7 +305,7 @@ def case_move_file_from_folder2_to_folder3():
         {
             'id': '863e1a7a-1304-42ae-943b-179184c077e3',
             'parentId': 'd515e43f-f3f6-4471-bb77-6b455017a2d2',
-            'date': '2022-02-02 12:00:00+00:00',
+            'date': '2022-02-02T12:00:00+00:00',
             'type': 'FILE',
             'url': '/file/url1',
             'size': 128,
@@ -313,7 +313,7 @@ def case_move_file_from_folder2_to_folder3():
         {
             'id': 'd515e43f-f3f6-4471-bb77-6b455017a2d2',
             'parentId': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-            'date': '2022-06-03 18:00:00+07:00',
+            'date': '2022-06-03T18:00:00+07:00',
             'type': 'FOLDER',
             'url': None,
             'size': 456,
@@ -321,7 +321,7 @@ def case_move_file_from_folder2_to_folder3():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-06-03 18:00:00+07:00',
+            'date': '2022-06-03T18:00:00+07:00',
             'type': 'FOLDER',
             'url': None,
             'size': 2056,
@@ -329,7 +329,7 @@ def case_move_file_from_folder2_to_folder3():
         {
             'id': '863e1a7a-1304-42ae-943b-179184c077e3',
             'parentId': 'd515e43f-f3f6-4471-bb77-6b455017a2d2',
-            'date': '2022-06-03 18:00:00+07:00',
+            'date': '2022-06-03T18:00:00+07:00',
             'type': 'FILE',
             'url': '/file/url1',
             'size': 200,
@@ -337,7 +337,7 @@ def case_move_file_from_folder2_to_folder3():
         {
             'id': '1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2',
             'parentId': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-            'date': '2022-02-03 15:00:00+00:00',
+            'date': '2022-02-03T15:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1600,
@@ -365,7 +365,7 @@ def case_move_folder3_in_folder2():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-01 12:00:00+00:00',
+            'date': '2022-02-01T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 0,
@@ -373,7 +373,7 @@ def case_move_folder3_in_folder2():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-02 12:00:00+00:00',
+            'date': '2022-02-02T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 384,
@@ -381,7 +381,7 @@ def case_move_folder3_in_folder2():
         {
             'id': '1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2',
             'parentId': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-            'date': '2022-02-03 12:00:00+00:00',
+            'date': '2022-02-03T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1536,
@@ -389,7 +389,7 @@ def case_move_folder3_in_folder2():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-03 12:00:00+00:00',
+            'date': '2022-02-03T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1920,
@@ -397,7 +397,7 @@ def case_move_folder3_in_folder2():
         {
             'id': 'd515e43f-f3f6-4471-bb77-6b455017a2d2',
             'parentId': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-            'date': '2022-02-02 12:00:00+00:00',
+            'date': '2022-02-02T12:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 384,
@@ -405,7 +405,7 @@ def case_move_folder3_in_folder2():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-02-03 15:00:00+00:00',
+            'date': '2022-02-03T15:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1984,
@@ -413,7 +413,7 @@ def case_move_folder3_in_folder2():
         {
             'id': '863e1a7a-1304-42ae-943b-179184c077e3',
             'parentId': 'd515e43f-f3f6-4471-bb77-6b455017a2d2',
-            'date': '2022-02-02 12:00:00+00:00',
+            'date': '2022-02-02T12:00:00+00:00',
             'type': 'FILE',
             'url': '/file/url1',
             'size': 128,
@@ -421,7 +421,7 @@ def case_move_folder3_in_folder2():
         {
             'id': 'd515e43f-f3f6-4471-bb77-6b455017a2d2',
             'parentId': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-            'date': '2022-06-03 18:00:00+07:00',
+            'date': '2022-06-03T18:00:00+07:00',
             'type': 'FOLDER',
             'url': None,
             'size': 456,
@@ -429,7 +429,7 @@ def case_move_folder3_in_folder2():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-06-03 18:00:00+07:00',
+            'date': '2022-06-03T18:00:00+07:00',
             'type': 'FOLDER',
             'url': None,
             'size': 2056,
@@ -437,7 +437,7 @@ def case_move_folder3_in_folder2():
         {
             'id': '863e1a7a-1304-42ae-943b-179184c077e3',
             'parentId': 'd515e43f-f3f6-4471-bb77-6b455017a2d2',
-            'date': '2022-06-03 18:00:00+07:00',
+            'date': '2022-06-03T18:00:00+07:00',
             'type': 'FILE',
             'url': '/file/url1',
             'size': 200,
@@ -445,7 +445,7 @@ def case_move_folder3_in_folder2():
         {
             'id': '1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2',
             'parentId': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-            'date': '2022-02-03 15:00:00+00:00',
+            'date': '2022-02-03T15:00:00+00:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1600,
@@ -453,7 +453,7 @@ def case_move_folder3_in_folder2():
         {
             'id': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
             'parentId': None,
-            'date': '2022-06-03 18:00:00+06:00',
+            'date': '2022-06-03T18:00:00+06:00',
             'type': 'FOLDER',
             'url': None,
             'size': 2056,
@@ -461,7 +461,7 @@ def case_move_folder3_in_folder2():
         {
             'id': '1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2',
             'parentId': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-            'date': '2022-06-03 18:00:00+06:00',
+            'date': '2022-06-03T18:00:00+06:00',
             'type': 'FOLDER',
             'url': None,
             'size': 1800,
@@ -469,7 +469,7 @@ def case_move_folder3_in_folder2():
         {
             'id': 'd515e43f-f3f6-4471-bb77-6b455017a2d2',
             'parentId': '069cb8d7-bbdd-47d3-ad8f-82ef4c269df1',
-            'date': '2022-06-03 18:00:00+06:00',
+            'date': '2022-06-03T18:00:00+06:00',
             'type': 'FOLDER',
             'url': None,
             'size': 256,

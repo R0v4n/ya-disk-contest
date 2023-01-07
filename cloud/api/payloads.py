@@ -22,7 +22,7 @@ def convert_asyncpg_record(value: Record):
 
 @convert.register
 def convert_datetime(value: datetime):
-    return value.isoformat(sep=' ')
+    return value.isoformat()
 
 
 @convert.register

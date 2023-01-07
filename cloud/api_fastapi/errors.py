@@ -52,27 +52,3 @@ def add_error_handlers(app: FastAPI):
 __all__ = 'add_error_handlers',
 
 
-# async def error_middleware(request, call_next):
-#     print('middleware executing!')
-#     try:
-#         return await call_next(request)
-#     except HTTPNotFound as err:
-#         print('not found!')
-#         return error_response(err.__class__, 'Item not found')
-#
-#     except (HTTPBadRequest, ParentIdValidationError):
-#         print('bad request')
-#         return error_response(HTTPBadRequest, 'Validation failed')
-#
-#     except HTTPException as err:
-#         print('general http exception')
-#         return error_response(err, err.detail)
-#
-#     except (RequestValidationError, ValidationError) as err:
-#         print('request validation error')
-#         return error_response(HTTPBadRequest, 'This should not be here!!! '+err.json())
-#
-#     except Exception:
-#         print('internal')
-#         return error_response(HTTPInternalServerError)
-

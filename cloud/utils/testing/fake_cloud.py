@@ -47,7 +47,7 @@ class Item(pdt.BaseModel):
     @property
     def export_dict(self):
         d = self.dict(exclude={'children', 'import_id'}, by_alias=True)
-        d['date'] = str(self.date)
+        d['date'] = self.date.isoformat()
         return d
 
     def tree_dict(self, nullify_folder_sizes=False):
@@ -58,7 +58,7 @@ class Item(pdt.BaseModel):
     @staticmethod
     def _cast_tree_types(tree: dict[str, Any], nullify_folder_sizes=False):
         def cast(node_dict: dict[str, Any]):
-            node_dict['date'] = str(node_dict['date'])
+            node_dict['date'] = node_dict['date'].isoformat()
             if node_dict['type'] == ItemType.FOLDER.value:
                 if nullify_folder_sizes:
                     node_dict['size'] = 0

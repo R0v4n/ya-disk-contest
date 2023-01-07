@@ -1,18 +1,25 @@
 from datetime import timedelta
+from itertools import accumulate
 
 import pytest
 from pytest_cases import parametrize_with_cases, unpack_fixture
 
 from cloud.model import ItemType
 from cloud.utils.testing import FakeCloud, Dataset, compare
-from tests import post_import_cases, get_node_cases
+from tests import get_node_cases
+from tests.post_import_cases import datasets
+
+stairway_datasets = list(accumulate(datasets, lambda s, x: s + [x], initial=[]))
 
 
-@parametrize_with_cases('dataset', post_import_cases)
-def test_load_import_with_static_data(fake_cloud_module, dataset: Dataset):
-    fake_cloud_module.load_import(dataset.import_dict)
-    compare(dataset.import_dict, fake_cloud_module.get_import_dict())
-    compare(fake_cloud_module.get_all_history(), dataset.expected_history)
+@pytest.mark.parametrize('datasets_stair', stairway_datasets)
+async def test_load_import_with_static_data(fake_cloud, datasets_stair: list[Dataset]):
+    for d in datasets_stair:
+        fake_cloud.load_import(d.import_dict)
+
+    if datasets_stair:
+        compare(datasets_stair[-1].import_dict, fake_cloud.get_import_dict())
+        compare(fake_cloud.get_all_history(), datasets_stair[-1].expected_history)
 
 
 @parametrize_with_cases('dataset', get_node_cases)

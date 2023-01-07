@@ -1,6 +1,5 @@
 import os
 import uuid
-from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
@@ -11,11 +10,40 @@ from cloud.settings import default_settings
 from cloud.utils.pg import make_alembic_config
 from cloud.utils.testing import FakeCloud
 
-PG_DSN = os.getenv('CLOUD_PG_DSN', default_settings.pg_dsn)
+PG_DSN = os.getenv('CI_CLOUD_PG_DSN', default_settings.pg_dsn)
 
 
-@contextmanager
-def _postgres():
+def pytest_addoption(parser):
+    parser.addoption(
+        "--aiohttp", action="store_true",
+        help="test aiohttp api client (without flag testing fastapi client)"
+    )
+    parser.addoption(
+        "--slow", action="store_true",
+        help="run slow tests"
+    )
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "slow: mark test as slow to run")
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--slow"):
+        return
+    skip_slow = pytest.mark.skip(reason="need --slow option to run")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip_slow)
+
+
+@pytest.fixture
+def is_aiohttp(request):
+    return request.config.getoption("--aiohttp")
+
+
+@pytest.fixture
+def postgres():
     tmp_name = f'{uuid.uuid4().hex}.pytest'
     tmp_url = str(URL(PG_DSN).with_path(tmp_name))
     create_database(tmp_url)
@@ -27,48 +55,20 @@ def _postgres():
 
 
 @pytest.fixture
-def postgres():
-    with _postgres() as res:
-        yield res
-
-
-@pytest.fixture(scope='module')
-def postgres_module():
-    with _postgres() as res:
-        yield res
-
-
-def _alembic_config(dsn):
-
+def alembic_config(postgres):
     cmd_options = SimpleNamespace(
         config='alembic.ini',
         name='alembic',
-        pg_dsn=dsn,
+        pg_dsn=postgres,
         raiseerr=False,
         x=None
     )
     config = make_alembic_config(cmd_options)
 
-    # config.set_section_option("logger_alembic", "level", "ERROR")
     return config
 
 
 @pytest.fixture
-def alembic_config(postgres):
-    return _alembic_config(postgres)
-
-
-@pytest.fixture(scope='module')
-def alembic_config_module(postgres_module):
-    return _alembic_config(postgres_module)
-
-
-@pytest.fixture
 def fake_cloud():
-    return FakeCloud()
-
-
-@pytest.fixture(scope='module')
-def fake_cloud_module():
     return FakeCloud()
 

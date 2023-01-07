@@ -5,7 +5,7 @@ from random import choice, randint, uniform
 
 from locust import HttpUser, task
 
-from cloud.api.handlers import ImportsView, DeleteNodeView, NodeView, UpdatesView, NodeHistoryView
+from cloud.resources import url_paths
 from cloud.utils.testing import FakeCloudGen, url_for
 
 
@@ -50,7 +50,7 @@ class User(HttpUser):
 
     @task(7)
     def post_import(self):
-        self.request('POST', ImportsView.URL_PATH, json=self.make_dataset())
+        self.request('POST', url_paths.IMPORTS, json=self.make_dataset())
 
     @task(1)
     def delete_node(self, node_id: str = None):
@@ -61,7 +61,7 @@ class User(HttpUser):
 
         if node_id:
             date = self.cloud.del_item(node_id, self.next_import_date())
-            path = url_for(DeleteNodeView.URL_PATH, {'node_id': node_id}, {'date': date})
+            path = url_for(url_paths.DELETE_NODE, {'node_id': node_id}, {'date': date})
             self.request('DELETE', path, name='del_node')
 
     def get_node(self, node_id: str = None, ids: list[str] | tuple[str] = None, **req_kwargs):
@@ -72,7 +72,7 @@ class User(HttpUser):
                 node_id = choice(ids)
 
         if node_id:
-            path = url_for(NodeView.URL_PATH, {'node_id': node_id})
+            path = url_for(url_paths.GET_NODE, {'node_id': node_id})
             self.request('GET', path, **req_kwargs)
 
     @task(18)
@@ -95,7 +95,7 @@ class User(HttpUser):
             de = ds + delta * uniform(0.1, 1.5)
 
             path = url_for(
-                NodeHistoryView.URL_PATH,
+                url_paths.GET_NODE_HISTORY,
                 path_params=dict(node_id=node_id),
                 query_params=dict(dateStart=ds, dateEnd=de)
             )
@@ -107,7 +107,7 @@ class User(HttpUser):
         date += timedelta(hours=randint(0, 24))
 
         path = url_for(
-            UpdatesView.URL_PATH,
+            url_paths.GET_UPDATES,
             query_params=dict(date=date)
         )
         self.request('GET', path, name='updates')

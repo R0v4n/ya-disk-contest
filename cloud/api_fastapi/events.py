@@ -12,6 +12,7 @@ async def startup_pg(app: FastAPI, settings: Settings):
         max_size=settings.pg_pool_max_size
     )
     await app.state.pg.fetchval('SELECT 1')
+    # todo: add logging
     print('db connected')
 
 

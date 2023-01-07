@@ -64,7 +64,7 @@ def case_folder_tree():
         'type': 'FOLDER',
         'url': None,
         'size': 0,
-        'date': '2022-10-25 09:05:43.818731+00:00',
+        'date': '2022-10-25T09:05:43.818731+00:00',
         'children': [
             {
                 'id': '4eaefb10-a86e-4f0d-b805-0db428199c77',
@@ -72,7 +72,7 @@ def case_folder_tree():
                 'type': 'FILE',
                 'url': '/attorney/our.txt',
                 'size': 31,
-                'date': '2022-10-25 09:05:43.818731+00:00',
+                'date': '2022-10-25T09:05:43.818731+00:00',
                 'children': None,
             },
             {
@@ -81,7 +81,7 @@ def case_folder_tree():
                 'type': 'FOLDER',
                 'url': None,
                 'size': 0,
-                'date': '2022-10-25 09:05:43.818731+00:00',
+                'date': '2022-10-25T09:05:43.818731+00:00',
                 'children': [
                     {
                         'id': '47b1719c-2adf-4cae-a380-e0af06c19d39',
@@ -89,7 +89,7 @@ def case_folder_tree():
                         'type': 'FILE',
                         'url': '/kind/consumer.jpeg',
                         'size': 50,
-                        'date': '2022-10-25 09:05:43.818731+00:00',
+                        'date': '2022-10-25T09:05:43.818731+00:00',
                         'children': None,
                     },
                     {
@@ -98,7 +98,7 @@ def case_folder_tree():
                         'type': 'FILE',
                         'url': '/respond/something.numbers',
                         'size': 82,
-                        'date': '2022-10-25 09:05:43.818731+00:00',
+                        'date': '2022-10-25T09:05:43.818731+00:00',
                         'children': None,
                     },
                     {
@@ -107,7 +107,7 @@ def case_folder_tree():
                         'type': 'FOLDER',
                         'url': None,
                         'size': 0,
-                        'date': '2022-10-25 09:05:43.818731+00:00',
+                        'date': '2022-10-25T09:05:43.818731+00:00',
                         'children': [
                             {
                                 'id': 'ee1cfdcd-1752-45db-b48a-26042ce874c7',
@@ -115,7 +115,7 @@ def case_folder_tree():
                                 'type': 'FILE',
                                 'url': '/up/discussion.mov',
                                 'size': 122,
-                                'date': '2022-10-25 09:05:43.818731+00:00',
+                                'date': '2022-10-25T09:05:43.818731+00:00',
                                 'children': None,
                             },
                         ],
@@ -148,7 +148,7 @@ def case_empty_folder():
         'type': 'FOLDER',
         'url': None,
         'size': 0,
-        'date': '2022-10-25 09:05:43.818731+00:00',
+        'date': '2022-10-25T09:05:43.818731+00:00',
         'children': [],
     }
 
@@ -175,7 +175,7 @@ def case_file():
                 'type': 'FILE',
                 'url': '/attorney/our.txt',
                 'size': 31,
-                'date': '2022-10-25 09:05:43.818731+00:00',
+                'date': '2022-10-25T09:05:43.818731+00:00',
                 'children': None,
             }
 

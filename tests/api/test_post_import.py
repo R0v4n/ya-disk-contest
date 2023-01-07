@@ -1,24 +1,29 @@
 from datetime import timedelta
 from http import HTTPStatus
+from itertools import accumulate
 
 import pytest
-from pytest_cases import parametrize, fixture, AUTO, parametrize_with_cases
+from pytest_cases import parametrize, fixture, AUTO
 
 from cloud.model import ItemType
 from cloud.utils.testing import post_import, FakeCloud, compare_db_fc_state, Folder, File, Dataset
-from tests import post_import_cases
+from tests.post_import_cases import datasets
+
+stairway_datasets = list(accumulate(datasets, lambda s, x: s + [x], initial=[]))
 
 
-@parametrize_with_cases('dataset', cases=post_import_cases)
+@pytest.mark.parametrize('datasets_stair', stairway_datasets)
 async def test_with_static_data(
-        dataset: Dataset,
-        api_client_module,
-        fake_cloud_module,
-        sync_connection_module
+        fake_cloud,
+        api_client,
+        sync_connection,
+        datasets_stair: list[Dataset]
 ):
-    fake_cloud_module.load_import(dataset.import_dict)
-    await post_import(api_client_module, dataset.import_dict)
-    compare_db_fc_state(sync_connection_module, fake_cloud_module)
+    for d in datasets_stair:
+        fake_cloud.load_import(d.import_dict)
+        await post_import(api_client, d.import_dict)
+
+    compare_db_fc_state(sync_connection, fake_cloud)
 
 
 @pytest.fixture
