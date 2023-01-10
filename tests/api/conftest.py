@@ -3,7 +3,7 @@ from alembic.command import upgrade
 from sqlalchemy import create_engine
 
 from cloud.settings import Settings
-from cloud.utils.testing.client_factory import aiohttp_client_factory, fastapi_client_factory
+from cloud.utils.testing.test_client_factory import aiohttp_client_factory, fastapi_client_factory
 
 
 @pytest.fixture

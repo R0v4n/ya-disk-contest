@@ -40,7 +40,7 @@ async def test_with_generated_import(schema, api_client, fake_cloud, sync_connec
     compare(received_tree, fake_cloud.get_tree(node_id, nullify_folder_sizes=True))
 
 
-async def test_non_existing_id(api_client, sync_connection, fake_cloud):
+async def test_nonexistent_id(api_client, sync_connection, fake_cloud):
     fake_cloud.generate_import([1], 1)
     direct_import_to_db(sync_connection, fake_cloud.get_import_dict())
     await get_node(api_client, File().id, HTTPStatus.NOT_FOUND)

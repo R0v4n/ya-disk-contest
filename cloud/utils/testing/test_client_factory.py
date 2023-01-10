@@ -10,8 +10,6 @@ from cloud.settings import Settings
 
 @asynccontextmanager
 async def aiohttp_client_factory(settings: Settings):
-    # todo: add logging
-    print('aiohttp')
     app = create_aiohttp_app(settings)
     server = TestServer(
         app,
@@ -29,7 +27,6 @@ async def aiohttp_client_factory(settings: Settings):
 
 @asynccontextmanager
 async def fastapi_client_factory(settings: Settings):
-    print('fastapi')
     app = create_fastapi_app(settings)
     async with AsyncClient(
             app=app,

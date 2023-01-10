@@ -1,21 +1,18 @@
-from asyncpgsa import PG
-from fastapi import FastAPI
+import logging
+
+from aiomisc_log import basic_config, LogFormat, create_logging_handler
 
 from cloud.settings import Settings
 
 
-async def startup_pg(app: FastAPI, settings: Settings):
-    app.state.pg = PG()
-    await app.state.pg.init(
-        str(settings.pg_dsn),
-        min_size=settings.pg_pool_min_size,
-        max_size=settings.pg_pool_max_size
-    )
-    await app.state.pg.fetchval('SELECT 1')
-    # todo: add logging
-    print('db connected')
-
-
-async def shutdown_pg(app: FastAPI):
-    await app.state.pg.pool.close()
-    print('db disconnected')
+def config_logging(settings: Settings):
+    basic_config(settings.log_level.name, settings.log_format.name)
+    loggers = (
+            logging.getLogger(name)
+            for name in logging.root.manager.loggerDict
+            if name.startswith("uvicorn.")
+        )
+    for uvicorn_logger in loggers:
+        uvicorn_logger.handlers = []
+    log_format = LogFormat[settings.log_format]
+    logging.getLogger("uvicorn").handlers = [create_logging_handler(log_format)]

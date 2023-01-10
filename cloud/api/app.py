@@ -16,11 +16,11 @@ from .payloads import JsonPayload
 logger = logging.getLogger(__name__)
 
 
-def create_app(args: Settings) -> Application:
+def create_app(settings: Settings) -> Application:
 
     app = Application(middlewares=[error_middleware])
     oas.setup(app)
-    app.cleanup_ctx.append(partial(pg_context, args=args))
+    app.cleanup_ctx.append(partial(pg_context, settings=settings))
 
     for handler in HANDLERS:
         logger.debug('Registering handler %r as %r', handler, handler.URL_PATH)

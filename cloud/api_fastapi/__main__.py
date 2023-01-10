@@ -6,14 +6,14 @@ from cloud.utils.typer_meets_pydantic import TyperEntryPoint
 
 
 @TyperEntryPoint(default_settings)
-def main(args: Settings):
-
-    app = create_app(args)
+def main(settings: Settings):
+    app = create_app(settings)
     uvicorn.run(
+        # 'cloud.api_fastapi.app:app',
         app,
-        host=str(args.api_address),
-        port=args.api_port,
-        log_level=args.log_level,
+        host=str(settings.api_address),
+        port=settings.api_port,
+        log_level=settings.log_level,
         # workers=args.api_workers_count
     )
 
