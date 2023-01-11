@@ -2,10 +2,11 @@ from datetime import datetime
 
 from asyncpgsa import PG
 from fastapi import APIRouter, status, Request, Depends
-from fastapi.responses import Response
+from fastapi.responses import Response, ORJSONResponse
 
 from cloud import model
 from cloud.resources import url_paths
+
 
 router = APIRouter(
     responses={
@@ -45,20 +46,34 @@ async def delete_node(mdl: model.NodeImportModel = Depends(), pg: PG = Depends(g
     return Response()
 
 
-@node_router.get(url_paths.GET_NODE, response_model=model.ResponseNodeTree)
+@node_router.get(
+    url_paths.GET_NODE,
+    response_model=model.ResponseNodeTree,
+    response_class=ORJSONResponse
+)
 async def node_tree(mdl: model.NodeModel = Depends(), pg: PG = Depends(get_pg)):
     await mdl.init(pg)
-    return await mdl.get_node()
+    tree = await mdl.get_node()
+    return ORJSONResponse(tree.dict(by_alias=True))
 
 
-@router.get(url_paths.GET_UPDATES, response_model=model.ListResponseItem)
+@router.get(
+    url_paths.GET_UPDATES,
+    response_model=model.ListResponseItem,
+    response_class=ORJSONResponse
+)
 async def updates(mdl: model.HistoryModel = Depends(), pg: PG = Depends(get_pg)):
     await mdl.init(pg)
-    return await mdl.get_files_updates()
+    items = await mdl.get_files_updates()
+    return ORJSONResponse(items.dict(by_alias=True))
 
 
 # noinspection PyPep8Naming
-@node_router.get(url_paths.GET_NODE_HISTORY, response_model=model.ListResponseItem)
+@node_router.get(
+    url_paths.GET_NODE_HISTORY,
+    response_model=model.ListResponseItem,
+    response_class=ORJSONResponse
+)
 async def node_history(
         dateStart: datetime,
         dateEnd: datetime,
@@ -66,7 +81,8 @@ async def node_history(
         pg: PG = Depends(get_pg)):
 
     await mdl.init(pg)
-    return await mdl.get_node_history(dateStart, dateEnd)
+    items = await mdl.get_node_history(dateStart, dateEnd)
+    return ORJSONResponse(items.dict(by_alias=True))
 
 
 router.include_router(node_router)

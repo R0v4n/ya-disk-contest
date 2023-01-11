@@ -2,7 +2,6 @@ from datetime import datetime
 from enum import Enum
 
 import pydantic as pdt
-from pydantic import Extra
 
 
 class ParentIdValidationError(ValueError):
@@ -69,7 +68,7 @@ class RequestImport(pdt.BaseModel):
     date: datetime = pdt.Field(alias='updateDate')
 
     class Config:
-        extra = Extra.forbid
+        extra = pdt.Extra.forbid
 
     # noinspection PyMethodParameters
     @pdt.validator('items')
