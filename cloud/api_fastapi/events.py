@@ -6,7 +6,7 @@ from cloud.settings import Settings
 
 
 def config_logging(settings: Settings):
-    basic_config(settings.log_level.name, settings.log_format.name)
+    basic_config(settings.log_level, settings.log_format)
     loggers = (
             logging.getLogger(name)
             for name in logging.root.manager.loggerDict

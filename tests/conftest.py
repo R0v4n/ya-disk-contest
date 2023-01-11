@@ -6,11 +6,11 @@ import pytest
 from sqlalchemy_utils import create_database, drop_database
 from yarl import URL
 
-from cloud.settings import default_settings
+from cloud.settings import Settings
 from cloud.utils.pg import make_alembic_config
 from cloud.utils.testing import FakeCloud
 
-PG_DSN = os.getenv('CI_CLOUD_PG_DSN', default_settings.pg_dsn)
+PG_DSN = os.getenv('CI_CLOUD_PG_DSN', Settings().pg_dsn)
 
 
 def pytest_addoption(parser):

@@ -12,12 +12,9 @@ services:
 
   api:
     image: r0van/cloud
-    command:
-      - "cloud-fastapi"
+    command: cloud-fastapi
     ports:
       - "8081:8081"
     environment:
       CLOUD_PG_POOL_MAX_SIZE: 50
       CLOUD_PG_DSN: "postgresql://user:psw@db:5432/cloud"
-
-

@@ -5,7 +5,7 @@ from typing import Callable, Any
 
 import typer
 from makefun import wraps
-from pydantic import ValidationError, BaseModel
+from pydantic import ValidationError, BaseSettings
 from rich import print
 
 
@@ -24,13 +24,13 @@ class TyperEntryPoint:
 
     __slots__ = 'cli_options',
 
-    def __init__(self, cli_options: BaseModel):
+    def __init__(self, cli_options: BaseSettings):
         """
         :param cli_options: pydantic model with optional "env_prefix" and "descriptions" Config attrs.
         """
         self.cli_options = cli_options
 
-    def __call__(self, func: Callable[[BaseModel], Any]):
+    def __call__(self, func: Callable[[BaseSettings], Any]):
         """
         Converting function signature for typer, validating values received from env and cli, run typer.
         Each cli_options field will be a distinct kw maybe arg with default value in the wrapper signature.

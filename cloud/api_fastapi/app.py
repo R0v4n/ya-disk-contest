@@ -1,16 +1,20 @@
-import json
 from functools import partial
 
 from fastapi import FastAPI
 
-from .events import config_logging
-from ..events import startup_pg, shutdown_pg
-from .routers import router
+from cloud.events import startup_pg, shutdown_pg
+from cloud.settings import Settings
+from cloud.utils.arguments_parse import clear_environ
+
 from .errors import add_error_handlers
-from cloud.settings import Settings, default_settings
+from .events import config_logging
+from .routers import router
 
 
-def create_app(settings: Settings):
+def create_app(settings: Settings = None):
+    settings = settings or Settings()
+    clear_environ(lambda name: name.startswith(Settings.Config.env_prefix))
+
     app = FastAPI(docs_url='/')
 
     app.add_event_handler(
@@ -35,7 +39,4 @@ def create_app(settings: Settings):
     return app
 
 
-# with open('/usr/share/python3/app/settings.json') as f:
-#     settings = Settings(**json.load(f))
-default_settings.pg_dsn = "postgresql://user:psw@db:5432/cloud"
-app = create_app(default_settings)
+app = create_app()

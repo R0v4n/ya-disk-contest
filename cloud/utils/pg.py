@@ -1,13 +1,13 @@
 from pathlib import Path
 from types import SimpleNamespace
+from argparse import Namespace
 
 from alembic.config import Config
-from configargparse import Namespace
 
 CLOUD_PATH = Path(__file__).parent.parent.resolve()
 
 
-def make_alembic_config(cmd_opts: Namespace | SimpleNamespace, base_path: str | Path = CLOUD_PATH) -> Config:
+def make_alembic_config(cmd_opts: SimpleNamespace | Namespace, base_path: str | Path = CLOUD_PATH) -> Config:
     """
     Создает объект конфигурации alembic на основе аргументов командной строки,
     подменяет относительные пути на абсолютные.

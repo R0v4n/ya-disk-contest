@@ -1,20 +1,21 @@
-import logging
 import argparse
-import os
+import logging
+
 from alembic.config import CommandLine
 
-from cloud.settings import default_settings
+from cloud.settings import Settings
 from cloud.utils.pg import make_alembic_config
 
 
 def main():
+    settings = Settings()
     logging.basicConfig(level=logging.DEBUG)
 
     alembic = CommandLine()
     alembic.parser.formatter_class = argparse.ArgumentDefaultsHelpFormatter
 
     alembic.parser.add_argument(
-        '--pg-dsn', default=os.getenv('CLOUD_PG_DSN', default_settings.pg_dsn),
+        '--pg-dsn', default=settings.pg_dsn,
         help='Database URL [env var: CLOUD_PG_DSN]'
     )
 

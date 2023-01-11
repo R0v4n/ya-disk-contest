@@ -9,28 +9,24 @@ from aiomisc_log import basic_config
 from setproctitle import setproctitle
 
 from cloud.api.app import create_app
-from cloud.settings import default_settings, Settings
+from cloud.settings import Settings
 from cloud.utils.arguments_parse import clear_environ
 from cloud.utils.typer_meets_pydantic import TyperEntryPoint
 
 
 # todo:
 #  -handle concurrent imports order somehow. queue is doing the job, but it is bad solution.
-#  -probably refactor to v 0.1.1 with more realistic imports and blocking only one folder branch in db.
-#  -Also in this case refactor history for folder
 #  -how to wait until db is ready?
-#  -run migrations from container
 #  -test faster json dump and load, uvloop
 #  -SA ORM
-#  -FastAPI
 
 
-@TyperEntryPoint(default_settings)
+@TyperEntryPoint(Settings())
 def _main(settings: Settings):
     """It's alive!"""
     clear_environ(lambda name: name.startswith(settings.Config.env_prefix))
 
-    basic_config(settings.log_level.name, settings.log_format.name)
+    basic_config(settings.log_level, settings.log_format)
 
     sock = bind_socket(address=str(settings.api_address), port=settings.api_port,
                        proto_name='http')

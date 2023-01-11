@@ -1,14 +1,15 @@
 import typer
 import uvicorn
 
-from cloud.settings import default_settings, Settings
+from cloud.settings import Settings
+from cloud.utils.arguments_parse import set_environ
 from cloud.utils.typer_meets_pydantic import TyperEntryPoint
 
 
-@TyperEntryPoint(default_settings)
+@TyperEntryPoint(Settings())
 def _main(settings: Settings):
+    set_environ(settings.envvars_dict())
 
-    # app = create_app(settings)
     uvicorn.run(
         'cloud.api_fastapi.app:app',
         host=str(settings.api_address),
