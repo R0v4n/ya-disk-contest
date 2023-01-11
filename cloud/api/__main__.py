@@ -2,6 +2,7 @@ import os
 from sys import argv
 
 import forklib
+import typer
 from aiohttp import web
 from aiomisc import bind_socket
 from aiomisc_log import basic_config
@@ -25,7 +26,7 @@ from cloud.utils.typer_meets_pydantic import TyperEntryPoint
 
 
 @TyperEntryPoint(default_settings)
-def main(settings: Settings):
+def _main(settings: Settings):
     """It's alive!"""
     clear_environ(lambda name: name.startswith(settings.Config.env_prefix))
 
@@ -47,6 +48,10 @@ def main(settings: Settings):
     else:
         app = create_app(settings)
         web.run_app(app, sock=sock)
+
+
+def main():
+    typer.run(_main)
 
 
 if __name__ == '__main__':

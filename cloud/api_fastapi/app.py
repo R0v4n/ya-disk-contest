@@ -1,3 +1,4 @@
+import json
 from functools import partial
 
 from fastapi import FastAPI
@@ -34,4 +35,7 @@ def create_app(settings: Settings):
     return app
 
 
+# with open('/usr/share/python3/app/settings.json') as f:
+#     settings = Settings(**json.load(f))
+default_settings.pg_dsn = "postgresql://user:psw@db:5432/cloud"
 app = create_app(default_settings)

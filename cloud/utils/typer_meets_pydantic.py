@@ -45,8 +45,8 @@ class TyperEntryPoint:
                 raise typer.Abort(1)
             else:
                 func(settings)
-
-        typer.run(wrapper)
+        return wrapper
+        # typer.run(wrapper)
 
     @staticmethod
     def _typer_type(value: Any):

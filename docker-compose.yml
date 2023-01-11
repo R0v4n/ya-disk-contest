@@ -11,7 +11,7 @@ services:
       - "5432:5432"
 
   api:
-    image: r0van/enrollment_autumn_2022
+    image: r0van/cloud
     command:
       - "cloud-fastapi"
     ports:
