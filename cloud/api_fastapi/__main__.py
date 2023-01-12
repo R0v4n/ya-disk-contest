@@ -7,7 +7,9 @@ from cloud.utils.typer_meets_pydantic import typer_entry_point
 
 
 @typer_entry_point
-def _main(settings: Settings):
+def main(settings: Settings):
+    """Run API server with fastapi web framework"""
+
     set_environ(settings.envvars_dict())
 
     uvicorn.run(
@@ -19,10 +21,6 @@ def _main(settings: Settings):
     )
 
 
-def main():
-    typer.run(_main)
-
-
 if __name__ == "__main__":
-    main()
+    typer.run(main)
 

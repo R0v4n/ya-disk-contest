@@ -29,4 +29,4 @@ COPY --from=builder /usr/share/python3/app /usr/share/python3/app
 RUN ln -snf /usr/share/python3/app/bin/cloud-* /usr/local/bin/
 
 # Устанавливаем выполняемую при запуске контейнера команду по умолчанию
-CMD cloud-fastapi
+CMD cloud-api fastapi

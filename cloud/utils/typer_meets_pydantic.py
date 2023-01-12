@@ -18,7 +18,7 @@ def _typer_type(value: Any):
 
 
 def get_base_settings_defaults(settings_type: type[BaseSettings]) -> dict[str, Any]:
-    return {key: val['default'] for key, val in settings_type.schema()['properties'].items()}
+    return {key: val.default for key, val in settings_type.__fields__.items()}
 
 
 def build_typer_parameters(settings_type: type[BaseSettings]) -> list[Parameter]:
@@ -137,3 +137,10 @@ class TyperEntryPoint:
 
 
 __all__ = 'typer_entry_point',
+
+
+if __name__ == '__main__':
+    from cloud.settings import Settings
+    l = Settings.__fields__['log_format'].default
+    print(l, type(l))
+    print(Settings.__fields__)

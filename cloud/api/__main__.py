@@ -15,8 +15,8 @@ from cloud.utils.typer_meets_pydantic import typer_entry_point
 
 
 @typer_entry_point
-def _main(settings: Settings):
-    """It's alive!"""
+def main(settings: Settings):
+    """Run API server with aiohttp web framework"""
     clear_environ(lambda name: name.startswith(settings.Config.env_prefix))
 
     basic_config(settings.log_level, settings.log_format)
@@ -39,9 +39,5 @@ def _main(settings: Settings):
         web.run_app(app, sock=sock)
 
 
-def main():
-    typer.run(_main)
-
-
 if __name__ == '__main__':
-    main()
+    typer.run(main)
