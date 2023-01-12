@@ -14,12 +14,6 @@ from cloud.utils.arguments_parse import clear_environ
 from cloud.utils.typer_meets_pydantic import typer_entry_point
 
 
-# todo:
-#  -handle concurrent imports order somehow. queue is doing the job, but it is bad solution.
-#  -how to wait until db is ready?
-#  -SA ORM
-
-
 @typer_entry_point
 def _main(settings: Settings):
     """It's alive!"""

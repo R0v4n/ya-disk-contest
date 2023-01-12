@@ -1,9 +1,8 @@
+import urllib.parse
 from datetime import datetime
 from enum import Enum
 from http import HTTPStatus
 from typing import Coroutine, Any, Iterable
-
-from aiohttp.web_urldispatcher import DynamicResource
 
 from cloud.resources import url_paths
 
@@ -49,27 +48,28 @@ class ResponseProxy:
 
 
 def url_for(path: str, path_params: dict = None, query_params: dict = None) -> str:
-    """
-    Generates URL for the aiohttp dynamic route with parameters.
-    """
 
     def cast_types(dict_: dict | None):
         if dict_ is None:
             return {}
 
         return {
-            key: str(value)
+            key: value.isoformat() if isinstance(value, datetime) else str(value)
             for key, value in dict_.items()
         }
 
     path_params = cast_types(path_params)
     query_params = cast_types(query_params)
-    # todo: refactor url
-    url = DynamicResource(path).url_for(**path_params)
-    if query_params:
-        url = url.update_query(**query_params)
 
-    return str(url)
+    url = path
+    for key, val in path_params.items():
+        url = url.replace('{'+key+'}', val, 1)
+
+    if query_params:
+        query = urllib.parse.urlencode(query_params)
+        url = f'{url}?{query}'
+
+    return url
 
 
 def expected_error_response(http_status_code: int):
@@ -96,10 +96,10 @@ async def post_import(
         client,
         data: dict,
         expected_status: int | Enum = HTTPStatus.OK,
-        url: str = url_paths.IMPORTS,
+        path: str = url_paths.IMPORTS,
         **request_kwargs):
 
-    res = await client.post(url, json=data, **request_kwargs)
+    res = await client.post(path, json=data, **request_kwargs)
     response = ResponseProxy(res)
 
     await check_response(response, expected_status)
@@ -110,11 +110,11 @@ async def get_node(
         client,
         node_id: str,
         expected_status: int | Enum = HTTPStatus.OK,
-        url: str = url_paths.GET_NODE,
+        path: str = url_paths.GET_NODE,
         **request_kwargs) -> list[dict] | None:
 
     res = await client.get(
-        url_for(url, dict(node_id=node_id)),
+        url_for(path, dict(node_id=node_id)),
         **request_kwargs
     )
 
@@ -132,11 +132,11 @@ async def del_node(
         node_id: str,
         date: datetime | str,
         expected_status: int | Enum = HTTPStatus.OK,
-        url: str = url_paths.DELETE_NODE,
+        path: str = url_paths.DELETE_NODE,
         **request_kwargs):
     res = await client.delete(
         url_for(
-            url,
+            path,
             path_params=dict(node_id=node_id),
             query_params=dict(date=date)
         ),
@@ -152,12 +152,12 @@ async def get_updates(
         client,
         date: datetime | str,
         expected_status: int | Enum = HTTPStatus.OK,
-        url: str = url_paths.GET_UPDATES,
+        path: str = url_paths.GET_UPDATES,
         **request_kwargs):
 
     res = await client.get(
         url_for(
-            url,
+            path,
             query_params=dict(date=date)
         ),
         **request_kwargs
@@ -177,12 +177,12 @@ async def get_node_history(
         date_start: datetime | str,
         date_end: datetime | str,
         expected_status: int | Enum = HTTPStatus.OK,
-        url: str = url_paths.GET_NODE_HISTORY,
+        path: str = url_paths.GET_NODE_HISTORY,
         **request_kwargs):
 
     res = await client.get(
         url_for(
-            url,
+            path,
             path_params=dict(node_id=node_id),
             query_params=dict(dateStart=date_start, dateEnd=date_end)
         ),
