@@ -1,32 +1,22 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Iterable, Mapping, Any, TypeVar
+from typing import Iterable, Mapping, Any
 
 from .schemas import RequestItem, ItemType, ResponseItem, Item
 
 
-# todo: how to deal with type hints here?
-class TreeMixin(ABC):
-
-    def __init__(self, **kwargs):
-        raise NotImplementedError
+class NodeTree(Item):
 
     @classmethod
-    @abstractmethod
-    def construct(cls, **kwargs) -> TreeT:
-        """method of pydantic.BaseModel"""
-
-    @classmethod
-    def from_records(cls, records: Iterable[Mapping[str, Any]]) -> list[TreeT]:
+    def from_records(cls, records: Iterable[Mapping[str, Any]]) -> list[NodeTree]:
         nodes = (cls(**rec) for rec in records)
         return cls.from_nodes(nodes)
 
     @classmethod
-    def from_nodes(cls, nodes: Iterable[Item | TreeT]) -> list[TreeT]:
+    def from_nodes(cls, nodes: Iterable[Item | NodeTree]) -> list[NodeTree]:
 
-        id_children_map: dict[str | None, list[TreeT]] = defaultdict(list)
+        id_children_map: dict[str | None, list[NodeTree]] = defaultdict(list)
 
         ids = set()
         for node in nodes:
@@ -45,11 +35,11 @@ class TreeMixin(ABC):
         return top_nodes
 
 
-class ResponseNodeTree(ResponseItem, TreeMixin):
+class ResponseNodeTree(ResponseItem, NodeTree):
     children: list[ResponseNodeTree] | None = None
 
 
-class RequestNodeTree(RequestItem, TreeMixin):
+class RequestNodeTree(RequestItem, NodeTree):
     children: list[RequestNodeTree] | None = None
 
     def flatten_nodes_dict_gen(self, import_id: int):
@@ -66,7 +56,4 @@ class RequestNodeTree(RequestItem, TreeMixin):
                     yield from get_dict(child)
 
         return get_dict(self)
-
-
-TreeT = TypeVar('TreeT', ResponseNodeTree, RequestNodeTree)
 

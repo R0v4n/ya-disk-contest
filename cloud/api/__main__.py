@@ -17,7 +17,6 @@ from cloud.utils.typer_meets_pydantic import typer_entry_point
 # todo:
 #  -handle concurrent imports order somehow. queue is doing the job, but it is bad solution.
 #  -how to wait until db is ready?
-#  -test faster json dump and load, uvloop
 #  -SA ORM
 
 
