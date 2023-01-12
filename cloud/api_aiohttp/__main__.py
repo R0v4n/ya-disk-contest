@@ -8,7 +8,7 @@ from aiomisc import bind_socket
 from aiomisc_log import basic_config
 from setproctitle import setproctitle
 
-from cloud.api.app import create_app
+from cloud.api_aiohttp.app import create_app
 from cloud.settings import Settings
 from cloud.utils.arguments_parse import clear_environ
 from cloud.utils.typer_meets_pydantic import typer_entry_point

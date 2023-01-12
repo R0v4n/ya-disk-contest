@@ -7,6 +7,7 @@ from cloud.settings import Settings
 
 def config_logging(settings: Settings):
     basic_config(settings.log_level, settings.log_format)
+    # todo: fix request logging
     loggers = (
             logging.getLogger(name)
             for name in logging.root.manager.loggerDict

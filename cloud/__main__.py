@@ -1,6 +1,6 @@
 import typer
 
-from .api.__main__ import main as aiohttp_main
+from .api_aiohttp.__main__ import main as aiohttp_main
 from .api_fastapi.__main__ import main as fastapi_main
 
 

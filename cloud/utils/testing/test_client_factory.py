@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from aiohttp.test_utils import TestServer, TestClient
 from httpx import AsyncClient
 
-from cloud.api.app import create_app as create_aiohttp_app
+from cloud.api_aiohttp.app import create_app as create_aiohttp_app
 from cloud.api_fastapi.app import create_app as create_fastapi_app
 from cloud.settings import Settings
 

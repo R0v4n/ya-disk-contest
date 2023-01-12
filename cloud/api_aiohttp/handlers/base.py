@@ -1,10 +1,10 @@
 from aiohttp.web_exceptions import HTTPBadRequest
-from aiohttp_pydantic import PydanticView
+from aiohttp_pydantic import PydanticView as BasePydanticView
 from asyncpgsa import PG
 from pydantic import ValidationError
 
 
-class BasePydanticView(PydanticView):
+class PydanticView(BasePydanticView):
     URL_PATH: str
 
     @property
