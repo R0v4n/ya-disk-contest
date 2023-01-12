@@ -1,11 +1,29 @@
 import os
+from enum import Enum
 
 from pydantic import BaseSettings, PostgresDsn, IPvAnyAddress, conint
 
-from cloud.utils.typer_meets_pydantic import LogLevel, LogFormat
-
-
 cpu_count = os.cpu_count() if os.name != 'nt' else 1
+
+
+class LogLevel(str, Enum):
+    # typer can't handle IntEnum... I'm just trying to explore tools...
+    critical = 'critical'
+    error = 'error'
+    warning = 'warning'
+    info = 'info'
+    debug = 'debug'
+
+
+class LogFormat(str, Enum):
+    stream = 'stream'
+    color = 'color'
+    json = 'json'
+    syslog = 'syslog'
+    plain = 'plain'
+    journald = 'journald'
+    rich = 'rich'
+    rich_tb = 'rich_tb'
 
 
 class Settings(BaseSettings):
@@ -25,7 +43,7 @@ class Settings(BaseSettings):
         validate_all = True
         use_enum_values = True
 
-        descriptions: list[str] = [
+        descriptions = [
             'IPv4/IPv6 address API server would listen on',
             'TCP port API server would listen on',
             'API client process count (default is the number of CPUs in the system)',

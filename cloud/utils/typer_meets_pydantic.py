@@ -1,5 +1,5 @@
 from enum import Enum
-from inspect import Parameter, Signature
+from inspect import Parameter, Signature, get_annotations
 from itertools import zip_longest
 from typing import Callable, Any
 
@@ -9,17 +9,77 @@ from pydantic import ValidationError, BaseSettings
 from rich import print
 
 
-class TyperEntryPoint:
+def _typer_type(value: Any):
+    """Typer by default handles only int, bool, str, Enum"""
+    if type(value) in (int, bool, str) or isinstance(value, Enum):
+        return type(value)
+    else:
+        return str
+
+
+def get_base_settings_defaults(settings_type: type[BaseSettings]) -> dict[str, Any]:
+    return {key: val['default'] for key, val in settings_type.schema()['properties'].items()}
+
+
+def build_typer_parameters(settings_type: type[BaseSettings]) -> list[Parameter]:
+    kwargs = get_base_settings_defaults(settings_type)
+
+    descriptions = getattr(settings_type.Config, 'descriptions', [])
+    env_prefix = getattr(settings_type.Config, 'env_prefix', '')
+
+    if len(kwargs) < len(descriptions):
+        raise ValueError
+
+    return [
+        Parameter(
+            key, kind=Parameter.POSITIONAL_OR_KEYWORD,
+            default=typer.Option(val, help=descr, envvar=env_prefix + key.upper()),
+            annotation=_typer_type(val)
+        ) for (key, val), descr in zip_longest(kwargs.items(), descriptions)
+    ]
+
+
+def typer_entry_point(func: Callable[[BaseSettings], Any]):
     """
-    Decorator class to convert a function into a typer entry point.
-    Decorated function should have exactly one argument,
-    that will receive cli_options instance with actual field values from env and cli (or defaults).
-    Each cli_options field will be an option with default value in cli.
+    Transforms function signature for typer, validates values received from env and cli with pydantic.
+
+    Decorated function should have exactly one argument annotated with BaseSettings subtype.
+    Each BaseSettings field will be an option with default value in cli (e.g. myapp --foo-bar).
+    BaseSettings.Config can optionally contain field "descriptions: list[str]",
+    that will be passed to cli option descriptions (myapp --help).
+
+    Decorated function will receive BaseSettings instance with actual field values
+    from env and cli options (or defaults).
     Also validates values with pydantic model.
 
-    This is a fast ad hoc implementation.
     I'm just imagining how pydantic and typer work together.
-    For now, it's support only cli options.
+    For now, this decorator support only cli options.
+    """
+
+    anno_types = tuple(get_annotations(func).values())
+
+    if len(anno_types) != 1 or not issubclass(anno_types[0], BaseSettings):
+        raise ValueError('The wrapped function must have exactly '
+                         'one argument of the BaseSettings subtype')
+
+    SettingsType: type[BaseSettings] = anno_types[0]
+
+    @wraps(func, Signature(build_typer_parameters(SettingsType)))
+    def wrapper(**kwargs):
+        try:
+            settings = SettingsType(**kwargs)
+        except ValidationError as err:
+            print(err)
+            raise typer.Abort(1)
+        else:
+            func(settings)
+
+    return wrapper
+
+
+class TyperEntryPoint:
+    """
+    Class decorator implementation.
     """
 
     __slots__ = 'cli_options',
@@ -45,6 +105,7 @@ class TyperEntryPoint:
                 raise typer.Abort(1)
             else:
                 func(settings)
+
         return wrapper
         # typer.run(wrapper)
 
@@ -75,21 +136,4 @@ class TyperEntryPoint:
         ]
 
 
-class LogLevel(str, Enum):
-    # typer can't handle IntEnum... I'm just trying to explore tools...
-    critical = 'critical'
-    error = 'error'
-    warning = 'warning'
-    info = 'info'
-    debug = 'debug'
-
-
-class LogFormat(str, Enum):
-    stream = 'stream'
-    color = 'color'
-    json = 'json'
-    syslog = 'syslog'
-    plain = 'plain'
-    journald = 'journald'
-    rich = 'rich'
-    rich_tb = 'rich_tb'
+__all__ = 'typer_entry_point',

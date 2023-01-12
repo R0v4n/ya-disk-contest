@@ -3,10 +3,10 @@ import uvicorn
 
 from cloud.settings import Settings
 from cloud.utils.arguments_parse import set_environ
-from cloud.utils.typer_meets_pydantic import TyperEntryPoint
+from cloud.utils.typer_meets_pydantic import typer_entry_point
 
 
-@TyperEntryPoint(Settings())
+@typer_entry_point
 def _main(settings: Settings):
     set_environ(settings.envvars_dict())
 

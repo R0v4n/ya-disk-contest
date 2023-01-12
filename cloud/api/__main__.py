@@ -11,7 +11,7 @@ from setproctitle import setproctitle
 from cloud.api.app import create_app
 from cloud.settings import Settings
 from cloud.utils.arguments_parse import clear_environ
-from cloud.utils.typer_meets_pydantic import TyperEntryPoint
+from cloud.utils.typer_meets_pydantic import typer_entry_point
 
 
 # todo:
@@ -21,7 +21,7 @@ from cloud.utils.typer_meets_pydantic import TyperEntryPoint
 #  -SA ORM
 
 
-@TyperEntryPoint(Settings())
+@typer_entry_point
 def _main(settings: Settings):
     """It's alive!"""
     clear_environ(lambda name: name.startswith(settings.Config.env_prefix))
