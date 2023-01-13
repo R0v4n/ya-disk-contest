@@ -2,12 +2,12 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from typing import Iterable, Any
 
-from aiohttp.web_exceptions import HTTPBadRequest
 from asyncpg import ForeignKeyViolationError
 from asyncpgsa.connection import SAConnection
 
 from .base import BaseImportModel
-from .schemas import RequestImport, ItemType, RequestItem, ParentIdValidationError
+from .schemas import RequestImport, ItemType, RequestItem
+from .exceptions import ParentNotFoundError, ModelValidationError
 from .node_tree import RequestNodeTree
 from .query_builder import FileQuery, FolderQuery, QueryT, Sign
 
@@ -35,9 +35,11 @@ class ImportModel(BaseImportModel):
         self.files_mdl = FileListModel(self.data, self.import_id, self.conn)
         await self.files_mdl.init()
 
-        if await self.files_mdl.any_id_exists(self.folders_mdl.ids) \
-                or await self.folders_mdl.any_id_exists(self.files_mdl.ids):
-            raise HTTPBadRequest
+        if await self.files_mdl.any_id_exists(self.folders_mdl.ids):
+            raise ModelValidationError('Some folder ids already exists in files ids')
+
+        if await self.folders_mdl.any_id_exists(self.files_mdl.ids):
+            raise ModelValidationError('Some file ids already exists in folders ids')
 
     async def write_folders_history(self):
         """
@@ -140,7 +142,7 @@ class NodeListBaseModel(ABC):
             try:
                 await self.conn.execute(self.Query.insert(self._get_new_nodes_records()))
             except ForeignKeyViolationError as err:
-                raise ParentIdValidationError(err.detail or '')
+                raise ParentNotFoundError(err.detail or '')
 
     @abstractmethod
     def _get_new_nodes_records(self) -> list[dict[str, Any]]:
@@ -163,7 +165,7 @@ class NodeListBaseModel(ABC):
                 await self.conn.executemany(self.Query.update_many(mapping), rows)
             # note: this can be a problem if FK error will be raised due to node id.
             except ForeignKeyViolationError as err:
-                raise ParentIdValidationError(err.detail or '')
+                raise ParentNotFoundError(err.detail or '')
 
     @abstractmethod
     async def write_history(self, ids: Iterable[str]):

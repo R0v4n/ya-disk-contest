@@ -43,6 +43,7 @@ class Settings(BaseSettings):
         validate_all = True
         use_enum_values = True
 
+        # args for typer.Option
         descriptions = [
             'IPv4/IPv6 address API server would listen on',
             'TCP port API server would listen on',
@@ -50,6 +51,17 @@ class Settings(BaseSettings):
             'URL to use to connect to the database',
             'Minimum database connections',
             'Maximum database connections'
+        ]
+
+        groups = [
+            'API options',
+            'API options',
+            'API options',
+            'Postgres options',
+            'Postgres options',
+            'Postgres options',
+            'Logging options',
+            'Logging options',
         ]
 
     def envvars_dict(self):

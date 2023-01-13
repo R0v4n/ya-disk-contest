@@ -7,7 +7,7 @@ from cloud.settings import Settings
 from cloud.utils.arguments_parse import clear_environ
 
 from .errors import add_error_handlers
-from .events import config_logging
+from .events import configure_logging
 from .routers import router
 
 
@@ -19,7 +19,7 @@ def create_app(settings: Settings = None):
 
     app.add_event_handler(
         'startup',
-        partial(config_logging, settings=settings)
+        partial(configure_logging, settings=settings)
     )
 
     app.add_event_handler(

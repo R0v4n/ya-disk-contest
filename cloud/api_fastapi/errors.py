@@ -1,14 +1,17 @@
+import logging
 from http import HTTPStatus
 
-from aiohttp.web_exceptions import HTTPNotFound, HTTPBadRequest, HTTPInternalServerError, HTTPException
-from fastapi import HTTPException as FastAPIHTTPException, FastAPI
+from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
+from starlette.exceptions import HTTPException
 from starlette.requests import Request
-
 from starlette.responses import JSONResponse
 
-from cloud.model import ParentIdValidationError
+from cloud.model.exceptions import ModelValidationError, ItemNotFoundError
+
+
+logger = logging.getLogger(__name__)
 
 messages = {
     HTTPStatus.BAD_REQUEST: 'Validation failed',
@@ -16,39 +19,55 @@ messages = {
 }
 
 
-def error_response(http_error_cls, message: str | None = None):
-    status = HTTPStatus(http_error_cls.status_code)
+def error_response(status_code: int, message: str | None = None):
+    status = HTTPStatus(status_code)
 
     error = {
-        'code': http_error_cls.status_code,
-        'message': message or status.description
+        'code': status_code,
+        'message': message or status.phrase
     }
-    return JSONResponse(content=error, status_code=http_error_cls.status_code)
+    return JSONResponse(content=error, status_code=status_code)
 
 
 async def http_error_handler(
         _: Request,
-        exc: HTTPException | FastAPIHTTPException
+        exc: HTTPException
 ) -> JSONResponse:
-    return error_response(exc, messages.get(exc.status_code))
+    return error_response(exc.status_code, exc.detail)
 
 
 async def http422_error_handler(
     _: Request,
-    exc: RequestValidationError | ValidationError | ParentIdValidationError,
+    __: RequestValidationError | ValidationError,
 ) -> JSONResponse:
-    return error_response(HTTPBadRequest, messages.get(HTTPBadRequest.status_code))
+    return error_response(HTTPStatus.BAD_REQUEST, messages.get(HTTPStatus.BAD_REQUEST))
+
+
+async def model_error_handler(
+    _: Request,
+    exc: ItemNotFoundError | ModelValidationError,
+) -> JSONResponse:
+    return error_response(exc.status_code, messages.get(exc.status_code))
+
+
+async def unhandled_error_handler(
+    _: Request,
+    __: Exception,
+) -> JSONResponse:
+    logger.exception('Unhandled exception')
+    return error_response(HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
 def add_error_handlers(app: FastAPI):
 
-    for exception in (HTTPException, FastAPIHTTPException):
-        app.add_exception_handler(exception, http_error_handler)
+    app.add_exception_handler(RequestValidationError, http422_error_handler)
 
-    for exception in (RequestValidationError, ValidationError, ParentIdValidationError):
-        app.add_exception_handler(exception, http422_error_handler)
+    for exception in (ItemNotFoundError, ModelValidationError):
+        app.add_exception_handler(exception, model_error_handler)
+
+    app.add_exception_handler(HTTPException, http_error_handler)
+    app.add_exception_handler(Exception, unhandled_error_handler)
 
 
 __all__ = 'add_error_handlers',
-
 

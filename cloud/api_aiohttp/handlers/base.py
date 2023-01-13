@@ -1,4 +1,3 @@
-from aiohttp.web_exceptions import HTTPBadRequest
 from aiohttp_pydantic import PydanticView as BasePydanticView
 from asyncpgsa import PG
 from pydantic import ValidationError
@@ -15,4 +14,4 @@ class PydanticView(BasePydanticView):
                                   exception: ValidationError,
                                   context: str):
 
-        raise HTTPBadRequest
+        raise exception

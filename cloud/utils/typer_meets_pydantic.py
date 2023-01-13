@@ -10,7 +10,7 @@ from rich import print
 
 
 def _typer_type(value: Any):
-    """Typer by default handles only int, bool, str, Enum"""
+    """Typer by default handles int, bool, str, Enum and some others"""
     if type(value) in (int, bool, str) or isinstance(value, Enum):
         return type(value)
     else:
@@ -26,16 +26,18 @@ def build_typer_parameters(settings_type: type[BaseSettings]) -> list[Parameter]
 
     descriptions = getattr(settings_type.Config, 'descriptions', [])
     env_prefix = getattr(settings_type.Config, 'env_prefix', '')
+    groups = getattr(settings_type.Config, 'groups', [])
 
-    if len(kwargs) < len(descriptions):
+    if len(kwargs) < len(descriptions) or len(kwargs) < len(groups):
         raise ValueError
 
     return [
         Parameter(
             key, kind=Parameter.POSITIONAL_OR_KEYWORD,
-            default=typer.Option(val, help=descr, envvar=env_prefix + key.upper()),
+            default=typer.Option(val, help=descr, envvar=env_prefix + key.upper(),
+                                 rich_help_panel=group),
             annotation=_typer_type(val)
-        ) for (key, val), descr in zip_longest(kwargs.items(), descriptions)
+        ) for (key, val), descr, group in zip_longest(kwargs.items(), descriptions, groups)
     ]
 
 
@@ -45,8 +47,10 @@ def typer_entry_point(func: Callable[[BaseSettings], Any]):
 
     Decorated function should have exactly one argument annotated with BaseSettings subtype.
     Each BaseSettings field will be an option with default value in cli (e.g. myapp --foo-bar).
-    BaseSettings.Config can optionally contain field "descriptions: list[str]",
-    that will be passed to cli option descriptions (myapp --help).
+
+    BaseSettings.Config can optionally contain fields:
+     - descriptions: list[str], that will be passed to typer.Option "help" argument.
+     - groups: list[str], that will be passed to typer.Option "rich_help_panel" argument.
 
     Decorated function will receive BaseSettings instance with actual field values
     from env and cli options (or defaults).
@@ -107,7 +111,6 @@ class TyperEntryPoint:
                 func(settings)
 
         return wrapper
-        # typer.run(wrapper)
 
     @staticmethod
     def _typer_type(value: Any):
@@ -137,10 +140,3 @@ class TyperEntryPoint:
 
 
 __all__ = 'typer_entry_point',
-
-
-if __name__ == '__main__':
-    from cloud.settings import Settings
-    l = Settings.__fields__['log_format'].default
-    print(l, type(l))
-    print(Settings.__fields__)

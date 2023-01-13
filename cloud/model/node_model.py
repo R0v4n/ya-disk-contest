@@ -1,8 +1,7 @@
 from datetime import datetime
 
-from aiohttp.web_exceptions import HTTPNotFound, HTTPBadRequest
-
 from .base import BaseImportModel, BaseModel
+from .exceptions import ModelValidationError, ItemNotFoundError
 from .schemas import ItemType, ListResponseItem
 from .node_tree import ResponseNodeTree
 from .query_builder import FileQuery, FolderQuery, Sign, QueryT
@@ -32,7 +31,7 @@ class NodeBaseModel(BaseModel):
             if node_exists:
                 return
 
-        raise HTTPNotFound()
+        raise ItemNotFoundError
 
 
 class NodeModel(NodeBaseModel):
@@ -50,7 +49,7 @@ class NodeModel(NodeBaseModel):
 
     async def get_node_history(self, date_start: datetime, date_end: datetime) -> ListResponseItem:
         if date_start >= date_end or date_end.tzinfo is None or date_start.tzinfo is None:
-            raise HTTPBadRequest
+            raise ModelValidationError
 
         query = self.query.select_nodes_union_history_in_daterange(
             date_start, date_end, self.node_id, closed=False)

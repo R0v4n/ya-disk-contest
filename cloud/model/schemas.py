@@ -4,10 +4,6 @@ from enum import Enum
 import pydantic as pdt
 
 
-class ParentIdValidationError(ValueError):
-    pass
-
-
 class ItemType(Enum):
     FILE = 'FILE'
     FOLDER = 'FOLDER'

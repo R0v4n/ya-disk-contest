@@ -4,8 +4,9 @@ from http import HTTPStatus
 from aiohttp.web_exceptions import HTTPBadRequest, HTTPException, HTTPInternalServerError, HTTPNotFound
 from aiohttp.web_middlewares import middleware
 from aiohttp.web_request import Request
+from pydantic import ValidationError
 
-from cloud.model import ParentIdValidationError
+from cloud.model.exceptions import ItemNotFoundError, ModelValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +25,11 @@ def format_http_error(http_error_cls, message: str | None = None):
 async def error_middleware(request: Request, handler):
     try:
         return await handler(request)
-    except HTTPNotFound as err:
-        raise format_http_error(err.__class__, 'Item not found')
 
-    except (HTTPBadRequest, ParentIdValidationError):
+    except ItemNotFoundError:
+        raise format_http_error(HTTPNotFound, 'Item not found')
+
+    except (ModelValidationError, ValidationError):
         raise format_http_error(HTTPBadRequest, 'Validation failed')
 
     except HTTPException as err:

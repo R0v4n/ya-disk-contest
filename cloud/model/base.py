@@ -1,13 +1,9 @@
 from datetime import datetime
 
-from aiohttp.web_exceptions import HTTPBadRequest
 from asyncpgsa.connection import SAConnection
 
+from .exceptions import NotInitializedError, ModelValidationError
 from .query_builder import insert_import_query
-
-
-class NotInitializedError(Exception):
-    pass
 
 
 class BaseModel:
@@ -33,20 +29,24 @@ class BaseImportModel(BaseModel):
 
     def __init__(self, date: datetime, *args):
         super().__init__(*args)
-        if date.tzinfo is None:
-            raise HTTPBadRequest
 
-        self._date = date
+        self.date = date
         self._import_id = None
 
     @property
     def date(self) -> datetime:
         return self._date
 
+    @date.setter
+    def date(self, date: datetime):
+        if date.tzinfo is None:
+            raise ModelValidationError
+        self._date = date
+
     @property
     def import_id(self) -> int:
         if self._import_id is None:
-            raise AttributeError(f'Need to call "self.insert_import" first to init import_id reference.')
+            raise NotInitializedError(f'{self.__class__.__name__}.insert_import needs to be called first.')
         return self._import_id
 
     async def insert_import(self):

@@ -46,6 +46,9 @@ class ResponseProxy:
         else:
             return data
 
+    def __repr__(self):
+        return f'<{self.__class__.__name__}: {self.status}>'
+
 
 def url_for(path: str, path_params: dict = None, query_params: dict = None) -> str:
 
@@ -89,6 +92,7 @@ async def check_response(response: ResponseProxy, expected_status: int):
 
     if expected_status != HTTPStatus.OK:
         error = await response.json()
+        print(error)
         assert error == expected_error_response(expected_status)
 
 

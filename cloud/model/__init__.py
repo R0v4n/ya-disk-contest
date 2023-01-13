@@ -1,7 +1,7 @@
 from .import_model import ImportModel
 from .schemas import (
     Item, RequestImport, ItemType, RequestItem, ResponseItem,
-    ListResponseItem, Error, ParentIdValidationError
+    ListResponseItem, Error
 )
 from .node_tree import ResponseNodeTree
 from .node_model import NodeImportModel, NodeModel
