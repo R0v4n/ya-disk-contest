@@ -3,6 +3,7 @@ from sqlalchemy import (
     Integer, BigInteger, String, Table, MetaData
 )
 
+
 convention = {
     'all_column_names': lambda constraint, table: '_'.join([
         column.name for column in constraint.columns.values()
@@ -31,6 +32,25 @@ imports_table = Table(
     Column('id', Integer, primary_key=True),
     Column('date', DateTime(timezone=True), nullable=False, index=True)
 )
+
+queue_table = Table(
+    'queue',
+    metadata,
+    Column('id', Integer, primary_key=True),
+    Column('date', DateTime(timezone=True), nullable=False, index=True)
+)
+
+# queue_table = Table(
+#     'queue',
+#     metadata,
+#     Column('import_id', Integer, ForeignKey('imports.id')),
+#     Column('id', String, primary_key=True),
+#     Column('parent_id', String, nullable=True),
+#     Column('url', String(255), nullable=True),
+#     Column('size', BigInteger, nullable=True),
+#     Column('type', Enum(ItemType, name='type'), nullable=False)
+# )
+
 
 folders_table = Table(
     'folders',

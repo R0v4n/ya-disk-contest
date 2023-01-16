@@ -6,7 +6,7 @@ from typing import Iterable, Any, TypeVar
 from sqlalchemy import Table, select, func, exists, literal_column, String
 from sqlalchemy.sql.elements import Null
 
-from cloud.db.schema import files_table, folder_history, folders_table, file_history, imports_table
+from cloud.db.schema import files_table, folder_history, folders_table, file_history, imports_table, queue_table
 from .schemas import ItemType
 
 
@@ -17,6 +17,22 @@ class Sign(IntEnum):
 
 def insert_import_query(date: datetime):
     return imports_table.insert().values({'date': date}).returning(imports_table.c.id)
+
+
+def insert_import_from_mdl_query(import_id: int, date: datetime):
+    return imports_table.insert().values({'id': import_id, 'date': date})
+
+
+def insert_queue_query(date: datetime):
+    return queue_table.insert().values({'date': date}).returning(queue_table.c.id)
+
+
+def get_oldest_queue_id():
+    return select([queue_table.c.id]).order_by(queue_table.c.date).limit(1)
+
+
+def delete_queue(id_: int):
+    return queue_table.delete().where(queue_table.c.id == id_)
 
 
 class QueryToolsMixin:
@@ -78,7 +94,7 @@ class QueryBase(ABC, QueryToolsMixin):
 
         parents = \
             select(cls._build_columns(folders_alias, columns)). \
-            select_from(
+                select_from(
                 folders_alias.join(
                     cls.table,
                     cls.table.c.parent_id == folders_alias.c.id
@@ -221,9 +237,9 @@ class FolderQuery(QueryBase):
             select([
                 direct_parents.c.id,
                 direct_parents.c.parent_id,
-                func.sum(sign*direct_parents.c.size).label('size')
+                func.sum(sign * direct_parents.c.size).label('size')
             ]). \
-            group_by(direct_parents.c.id, direct_parents.c.parent_id).cte(recursive=True)
+                group_by(direct_parents.c.id, direct_parents.c.parent_id).cte(recursive=True)
 
         folders_alias = folders_table.alias()
         parents_alias = parents_cte.alias()
@@ -247,8 +263,8 @@ class FolderQuery(QueryBase):
                 [parents_recursive.c.id,
                  func.sum(parents_recursive.c.size).label('size')]
             ). \
-            select_from(parents_recursive). \
-            group_by(parents_recursive.c.id)
+                select_from(parents_recursive). \
+                group_by(parents_recursive.c.id)
 
         return all_parents
 

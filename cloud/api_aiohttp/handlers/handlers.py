@@ -42,6 +42,7 @@ class ImportsView(PydanticView):
         """
         mdl = self.ModelT(data)
 
+        # fixme: need refactor like in fastapi route
         async with self.pg.transaction() as conn:
             await mdl.init(conn)
             await mdl.execute_post_import()

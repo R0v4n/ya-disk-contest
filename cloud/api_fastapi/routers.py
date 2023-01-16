@@ -27,9 +27,8 @@ def get_pg(request: Request) -> PG:
 
 @router.post(url_paths.IMPORTS, response_class=Response)
 async def imports(mdl: model.ImportModel = Depends(), pg: PG = Depends(get_pg)):
-    async with pg.transaction() as conn:
-        await mdl.init(conn)
-        await mdl.execute_post_import()
+    await mdl.init(pg)
+    await mdl.execute_post_import()
 
     return Response()
 
@@ -39,9 +38,8 @@ async def imports(mdl: model.ImportModel = Depends(), pg: PG = Depends(get_pg)):
     response_class=Response,
 )
 async def delete_node(mdl: model.NodeImportModel = Depends(), pg: PG = Depends(get_pg)):
-    async with pg.transaction() as conn:
-        await mdl.init(conn)
-        await mdl.execute_delete_node()
+    await mdl.init(pg)
+    await mdl.execute_delete_node()
 
     return Response()
 

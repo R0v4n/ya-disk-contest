@@ -6,10 +6,10 @@ from asyncpg import ForeignKeyViolationError
 from asyncpgsa.connection import SAConnection
 
 from .base import BaseImportModel
-from .schemas import RequestImport, ItemType, RequestItem
 from .exceptions import ParentNotFoundError, ModelValidationError
 from .node_tree import RequestNodeTree
 from .query_builder import FileQuery, FolderQuery, QueryT, Sign
+from .schemas import RequestImport, ItemType, RequestItem
 
 
 class ImportModel(BaseImportModel):
@@ -25,9 +25,7 @@ class ImportModel(BaseImportModel):
         self.files_mdl: FileListModel | None = None
         self.folders_mdl: FolderListModel | None = None
 
-    async def init(self, connection):
-        await super().init(connection)
-        await self.insert_import()
+    async def init_sub_models(self):
 
         self.folders_mdl = FolderListModel(self.data, self.import_id, self.conn)
         await self.folders_mdl.init()
@@ -68,26 +66,33 @@ class ImportModel(BaseImportModel):
         await self.folders_mdl.write_history(ids_set)
 
     async def execute_post_import(self):
-        await self.write_folders_history()
-        # write files history
-        await self.files_mdl.write_history(self.files_mdl.existent_ids)
-        # subtract  parent sizes
-        await self.folders_mdl.update_parent_sizes(
-            self.files_mdl.existent_ids,
-            self.folders_mdl.existent_ids,
-            Sign.SUB
-        )
-        # insert new nodes
-        await self.folders_mdl.insert_new(),
-        await self.files_mdl.insert_new(),
-        # update existent nodes
-        await self.folders_mdl.update_existent(),
-        await self.files_mdl.update_existent(),
-        # add parent sizes
-        await self.folders_mdl.update_parent_sizes(
-            self.files_mdl.ids,
-            self.folders_mdl.ids
-        )
+        await self.queue_wait()
+
+        async with self._conn.transaction() as conn:
+            self._conn = conn
+            await self.insert_import_with_model_id()
+            await self.init_sub_models()
+
+            await self.write_folders_history()
+            # write files history
+            await self.files_mdl.write_history(self.files_mdl.existent_ids)
+            # subtract  parent sizes
+            await self.folders_mdl.update_parent_sizes(
+                self.files_mdl.existent_ids,
+                self.folders_mdl.existent_ids,
+                Sign.SUB
+            )
+            # insert new nodes
+            await self.folders_mdl.insert_new(),
+            await self.files_mdl.insert_new(),
+            # update existent nodes
+            await self.folders_mdl.update_existent(),
+            await self.files_mdl.update_existent(),
+            # add parent sizes
+            await self.folders_mdl.update_parent_sizes(
+                self.files_mdl.ids,
+                self.folders_mdl.ids
+            )
 
 
 class NodeListBaseModel(ABC):

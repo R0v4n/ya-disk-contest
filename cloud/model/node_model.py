@@ -67,14 +67,16 @@ class NodeImportModel(BaseImportModel, NodeBaseModel):
         super().__init__(date, node_id)
 
     async def execute_delete_node(self):
-        await self.insert_import()
+        await self.queue_wait()
+        async with self._conn.transaction() as conn:
+            self._conn = conn
+            await self.insert_import_with_model_id()
+            parents = self.query.recursive_parents(self.node_id)
+            history_q = FolderQuery.insert_history_from_select(parents)
 
-        parents = self.query.recursive_parents(self.node_id)
-        history_q = FolderQuery.insert_history_from_select(parents)
+            file_id, folder_id = (self.node_id, None) if self.node_type == ItemType.FILE else (None, self.node_id)
+            update_q = FolderQuery.update_parent_sizes(file_id, folder_id, self.import_id, Sign.SUB)
 
-        file_id, folder_id = (self.node_id, None) if self.node_type == ItemType.FILE else (None, self.node_id)
-        update_q = FolderQuery.update_parent_sizes(file_id, folder_id, self.import_id, Sign.SUB)
-
-        await self.conn.execute(history_q)
-        await self.conn.execute(update_q)
-        await self.conn.execute(self.query.delete(self.node_id))
+            await self.conn.execute(history_q)
+            await self.conn.execute(update_q)
+            await self.conn.execute(self.query.delete(self.node_id))

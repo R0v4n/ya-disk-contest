@@ -75,31 +75,35 @@ def compare(
         ignore_order=True,
         report_repetition=True,
         **kwargs):
-
     diff = DeepDiff(received, expected, ignore_order=ignore_order, report_repetition=report_repetition, **kwargs)
     assert diff == {}, assertion_error_note
 
 
 def compare_db_fc_state(connection: Connection, fake_cloud: FakeCloud):
-
     received_imports = get_imports_records(connection)
     expected_imports = fake_cloud.get_raw_db_imports_records()
 
-    compare(received_imports, expected_imports, 'imports!')
+    compare(received_imports, expected_imports, 'imports!',
+            # note: imports table receive id from queue table, and it may distinguish from actual imports order.
+            exclude_regex_paths=r"root\[\d+\]\['id'\]")
 
     received_files = get_node_records(connection, ItemType.FILE)
     received_folders = get_node_records(connection, ItemType.FOLDER)
     expected_files, expected_folders = fake_cloud.get_raw_db_node_records()
 
-    compare(received_files, expected_files, 'files!')
-    compare(received_folders, expected_folders, 'folders!')
+    compare(received_files, expected_files, 'files!',
+            exclude_regex_paths=r"root\[\d+\]\['import_id'\]")
+    compare(received_folders, expected_folders, 'folders!',
+            exclude_regex_paths=r"root\[\d+\]\['import_id'\]")
 
     received_file_history = get_history_records(connection, ItemType.FILE)
     received_folder_history = get_history_records(connection, ItemType.FOLDER)
     expected_file_history, expected_folder_history = fake_cloud.get_raw_db_history_records()
 
-    compare(received_file_history, expected_file_history, 'file history!')
-    compare(received_folder_history, expected_folder_history, 'folder history!')
+    compare(received_file_history, expected_file_history, 'file history!',
+            exclude_regex_paths=r"root\[\d+\]\['import_id'\]")
+    compare(received_folder_history, expected_folder_history, 'folder history!',
+            exclude_regex_paths=r"root\[\d+\]\['import_id'\]")
 
 
 @dataclass
