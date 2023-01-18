@@ -283,6 +283,52 @@ class FolderQuery(QueryBase):
 
         return query
 
+    @classmethod
+    def insert_history(cls, ids):
+        return f"""WITH RECURSIVE anon_1(import_id, id, parent_id, size) AS
+                   (SELECT folders.import_id AS import_id,
+                           folders.id        AS id,
+                           folders.parent_id AS parent_id,
+                           folders.size      AS size
+                    FROM folders
+                    WHERE folders.id IN ({', '.join(f"'{i}'" for i in ids)})
+                    UNION ALL
+                    SELECT folders_1.import_id AS import_id,
+                           folders_1.id        AS id,
+                           folders_1.parent_id AS parent_id,
+                           folders_1.size      AS size
+                    FROM folders AS folders_1,
+                         anon_1 AS anon_2
+                    WHERE folders_1.id = anon_2.parent_id)
+                    INSERT
+                    INTO folder_history (import_id, folder_id, parent_id, size)
+                    SELECT import_id, id, parent_id, size
+                    FROM (SELECT anon_1.import_id,
+                                 anon_1.id,
+                                 anon_1.parent_id,
+                                 anon_1.size,
+                                 pg_advisory_xact_lock(hashtextextended(anon_1.id, 0))
+                          FROM anon_1) as tmp"""
+
+    @classmethod
+    def lock_rows(cls, ids):
+        return f"""WITH RECURSIVE anon_1(import_id, id, parent_id, size) AS
+                   (SELECT folders.import_id AS import_id,
+                           folders.id        AS id,
+                           folders.parent_id AS parent_id,
+                           folders.size      AS size
+                    FROM folders
+                    WHERE folders.id IN ({', '.join(f"'{i}'" for i in ids)})
+                    UNION ALL
+                    SELECT folders_1.import_id AS import_id,
+                           folders_1.id        AS id,
+                           folders_1.parent_id AS parent_id,
+                           folders_1.size      AS size
+                    FROM folders AS folders_1,
+                         anon_1 AS anon_2
+                    WHERE folders_1.id = anon_2.parent_id)
+SELECT pg_advisory_xact_lock(hashtextextended(anon_1.id, 0)) FROM anon_1"""
+
 
 class FileQuery(QueryBase):
     """Class for file_table queries"""

@@ -65,6 +65,19 @@ class ImportModel(BaseImportModel):
 
         await self.folders_mdl.write_history(ids_set)
 
+    def updated_folders_ids(self):
+        # all folders and their new direct parents (4), (3)
+        ids_set = reduce(set.union, ({i.id, i.parent_id} for i in self.folders_mdl.nodes), set())
+        # union files new parents (3)
+        ids_set |= {i.parent_id for i in self.files_mdl.nodes}
+        # union files old parents (1), (2)
+        ids_set |= self.files_mdl.existent_parent_ids
+        # diff new folder
+        ids_set -= self.folders_mdl.new_ids
+        # diff "root id"
+        ids_set -= {None}
+        return ids_set
+
     async def execute_post_import(self):
         await self.queue_wait()
 
@@ -72,7 +85,12 @@ class ImportModel(BaseImportModel):
             self._conn = conn
             await self.insert_import_with_model_id()
             await self.init_sub_models()
-
+            ids = self.updated_folders_ids()
+            if ids:
+                await self.conn.execute(
+                    self.folders_mdl.Query.lock_rows(
+                        ids
+                    ))
             await self.write_folders_history()
             # write files history
             await self.files_mdl.write_history(self.files_mdl.existent_ids)
@@ -216,11 +234,12 @@ class FolderListModel(NodeListBaseModel):
     async def write_history(self, ids: Iterable[str]):
         """write  folder table records with given ids and all their recursive parents to history table"""
         if ids:
-            folders_select = self.Query.select(ids)
-            parents = self.Query.recursive_parents(ids)
-            insert_hist = self.Query.insert_history_from_select(folders_select.union(parents))
-
-            await self.conn.execute(insert_hist)
+            # folders_select = self.Query.select(ids)
+            # parents = self.Query.recursive_parents(ids)
+            # insert_hist = self.Query.insert_history_from_select(folders_select.union(parents))
+            # await self.conn.execute(insert_hist)
+            q = self.Query.insert_history(ids)
+            await self.conn.execute(q)
 
     async def update_parent_sizes(self, child_files_ids: Iterable[str],
                                   child_folders_ids: Iterable[str], sign: Sign = Sign.ADD):

@@ -63,14 +63,19 @@ class BaseImportModel(BaseModel):
     async def acquire_imports_table_lock(self):
         await self.conn.execute('LOCK TABLE imports IN SHARE ROW EXCLUSIVE MODE;')
 
+    async def acquire_lock(self, ids: list[str]):
+        text_query = 'VALUES '
+        text_query += ', '.join(f"(pg_advisory_xact_lock(hashtextextended('{i}', 0)))" for i in ids)
+        await self.conn.execute(text_query)
+
     # note: not used
     async def insert_import(self):
-        await self.acquire_imports_table_lock()
+        # await self.acquire_imports_table_lock()
         self._import_id = await self.conn.fetchval(insert_import_query(self.date))
 
     # note: lock imports table!
     async def insert_import_with_model_id(self):
-        await self.acquire_imports_table_lock()
+        # await self.acquire_imports_table_lock()
         await self.conn.execute(insert_import_from_mdl_query(self._import_id, self._date))
 
     async def insert_queue(self):

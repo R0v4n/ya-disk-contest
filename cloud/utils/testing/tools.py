@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from deepdiff import DeepDiff
 from sqlalchemy.engine import Connection
-
+from rich import print
 from cloud.model import ItemType
 from cloud.db.schema import imports_table, folders_table, files_table, folder_history, file_history
 from .fake_cloud import FakeCloud
@@ -75,7 +75,10 @@ def compare(
         ignore_order=True,
         report_repetition=True,
         **kwargs):
-    diff = DeepDiff(received, expected, ignore_order=ignore_order, report_repetition=report_repetition, **kwargs)
+    diff = DeepDiff(received, expected, ignore_order=ignore_order,
+                    report_repetition=report_repetition, verbose_level=1, **kwargs)
+    if assertion_error_note == 'folder history!':
+        print(diff)
     assert diff == {}, assertion_error_note
 
 
@@ -99,7 +102,8 @@ def compare_db_fc_state(connection: Connection, fake_cloud: FakeCloud):
     received_file_history = get_history_records(connection, ItemType.FILE)
     received_folder_history = get_history_records(connection, ItemType.FOLDER)
     expected_file_history, expected_folder_history = fake_cloud.get_raw_db_history_records()
-
+    print(received_folder_history)
+    print(expected_folder_history)
     compare(received_file_history, expected_file_history, 'file history!',
             exclude_regex_paths=r"root\[\d+\]\['import_id'\]")
     compare(received_folder_history, expected_folder_history, 'folder history!',
