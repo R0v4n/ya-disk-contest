@@ -437,7 +437,7 @@ class FakeCloud:
             # note: this can be an issue in some cases
             #  (e.g. some datetime.now added manually, after generating future datetime)
             if self._imports and self._imports[-1].date >= date:
-                date = self._imports[-1].date + timedelta(seconds=1)
+                date = self._imports[-1].date + timedelta(microseconds=1)
 
         self._imports.append(Import(id=len(self._imports) + 1, date=date))
 

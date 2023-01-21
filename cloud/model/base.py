@@ -100,7 +100,7 @@ class BaseImportModel(BaseModel):
             t += 1
             if oldest_queue_id == self._queue_id:
                 self._import_id = oldest_queue_id
-                logger.debug(
+                logger.info(
                     'handler for import with id=%s sent %s queue waiting query to db.',
                     oldest_queue_id, t
                 )

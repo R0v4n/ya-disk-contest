@@ -1,22 +1,48 @@
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from http import HTTPStatus
 from random import choice, randint, uniform
 
-from locust import HttpUser, task
+import requests
+from locust import task, FastHttpUser, constant, events
+from locust.runners import MasterRunner
 
 from cloud.resources import url_paths
+from cloud.settings import Settings
 from cloud.utils.testing import FakeCloudGen, url_for
 
+API_HOST = f'http://localhost:{Settings().api_port}'
 
-class User(HttpUser):
-    _last_import_date: datetime = datetime.now(timezone.utc)
-    _date_start: datetime = _last_import_date
+cloud: FakeCloudGen | None = None
+first_import_date: datetime | None = None
+
+
+# todo: check asyncpgsa logs and fix queries
+
+@events.test_start.add_listener
+def on_test_start(environment, **_kwargs):
+    global cloud, first_import_date
+    if not isinstance(environment.runner, MasterRunner):
+        cloud = FakeCloudGen(write_history=False)
+        top_folders_count = 10
+        cloud.generate_import(*[[] for _ in range(top_folders_count)])
+        first_import_date = cloud.last_import_date
+
+        response = requests.post(API_HOST + url_paths.IMPORTS, json=cloud.get_import_dict())
+        if response.status_code == HTTPStatus.OK:
+            logging.info('created %d top folders', top_folders_count)
+        else:
+            logging.info('failed to create top folders, status code: %d', response.status_code)
+
+
+class User(FastHttpUser):
+    _amount = 0
+    wait_time = constant(0.2)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.cloud = FakeCloudGen(write_history=False)
-        self.import_count = 0
+        self.__class__._amount += 1
+        self.id = self.__class__._amount
 
     def request(self, method, path, expected_status=HTTPStatus.OK, **kwargs):
         with self.client.request(
@@ -27,47 +53,39 @@ class User(HttpUser):
                              f'got {resp.status_code}')
 
             logging.info(
-                '%s: %s, http status %d (expected %d), took %rs',
-                method, path, resp.status_code, expected_status,
-                resp.elapsed.total_seconds()
+                '%s: %s, http status %d (expected %d)',
+                method, path, resp.status_code, expected_status
             )
             return resp
 
-    @classmethod
-    def next_import_date(cls):
-        # lesser timedelta will cause huge updates response size.
-        cls._last_import_date += timedelta(hours=randint(3, 72))
-        return cls._last_import_date
-
-    def make_dataset(self):
-        self.cloud.random_import(
-            schemas_count=2,
-            date=self.next_import_date(),
-            allow_random_count=True
-        )
-        self.cloud.random_updates(count=5, allow_random_count=True)
-        return self.cloud.get_import_dict()
-
     @task(7)
     def post_import(self):
-        self.request('POST', url_paths.IMPORTS, json=self.make_dataset())
+        cloud.random_import(schemas_count=2)
+        # todo: think about to do top folders untouchable
+        cloud.random_updates(count=5)
+
+        data = cloud.get_import_dict()
+        print(f'POST: date={data["updateDate"]}', self.id)
+        self.request('POST', url_paths.IMPORTS, json=data)
 
     @task(1)
     def delete_node(self, node_id: str = None):
         if node_id is None:
-            ids = self.cloud.ids
+            ids = cloud.ids
             if ids:
                 node_id = choice(ids)
 
         if node_id:
-            date = self.cloud.del_item(node_id, self.next_import_date())
+            date = cloud.del_item(node_id)
             path = url_for(url_paths.DELETE_NODE, {'node_id': node_id}, {'date': date})
-            self.request('DELETE', path, name='del_node')
+            print(f'DELETE: date={date}', self.id)
+
+            self.request('DELETE', path, name=url_paths.DELETE_NODE)
 
     def get_node(self, node_id: str = None, ids: list[str] | tuple[str] = None, **req_kwargs):
         if node_id is None:
             if ids is None:
-                ids = self.cloud.ids
+                ids = cloud.ids
             if ids:
                 node_id = choice(ids)
 
@@ -77,23 +95,23 @@ class User(HttpUser):
 
     @task(18)
     def get_folder(self, folder_id: str = None):
-        self.get_node(folder_id, self.cloud.folder_ids, name='get_folder')
+        self.get_node(folder_id, cloud.folder_ids, name='get_folder')
 
     @task(2)
     def get_file(self, file_id: str = None):
-        self.get_node(file_id, self.cloud.file_ids, name='get_file')
+        self.get_node(file_id, cloud.file_ids, name='get_file')
 
     @task(20)
     def get_node_history(self):
-        ids = self.cloud.ids
+        ids = cloud.ids
         if ids:
             node_id = choice(ids)
 
-            delta = self._last_import_date - self._date_start
+            delta = cloud.last_import_date - first_import_date
 
-            ds = self._date_start + delta * uniform(-1, 1)
+            ds = first_import_date + delta * uniform(-1, 1)
             de = ds + delta * uniform(0.1, 1.5)
-
+            print('NODE HISTORY:', ds, de)
             path = url_for(
                 url_paths.GET_NODE_HISTORY,
                 path_params=dict(node_id=node_id),
@@ -103,7 +121,7 @@ class User(HttpUser):
 
     @task(8)
     def get_updates(self):
-        date = self._date_start + uniform(0, 1) * (self._last_import_date - self._date_start)
+        date = first_import_date + uniform(0, 1) * (cloud.last_import_date - first_import_date)
         date += timedelta(hours=randint(0, 24))
 
         path = url_for(
@@ -112,3 +130,4 @@ class User(HttpUser):
         )
         self.request('GET', path, name='updates')
 
+    # todo: on_start each user creates top folder

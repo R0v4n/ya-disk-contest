@@ -12,6 +12,8 @@ from .query_builder import FileQuery, FolderQuery, QueryT, Sign
 from .schemas import RequestImport, ItemType, RequestItem
 
 
+# todo: clean WHERE 1!=1
+
 class ImportModel(BaseImportModel):
     """Wraps FolderListModel and FileListModel interfaces in calls to init and execute_post_import methods"""
 
@@ -149,13 +151,16 @@ class NodeListBaseModel(ABC):
         self._new_ids = self.ids - self.existent_ids
 
     async def get_existing_ids(self) -> tuple[set[str], set[str]]:
-        query = self.Query.select(self.ids, ['id', 'parent_id'])
+        if self.ids:
+            query = self.Query.select(self.ids, ['id', 'parent_id'])
 
-        return reduce(
-            lambda s, x: (s[0] | {x['id']}, s[1] | {x['parent_id']}),
-            await self.conn.fetch(query),
-            (set(), set())
-        )
+            return reduce(
+                lambda s, x: (s[0] | {x['id']}, s[1] | {x['parent_id']}),
+                await self.conn.fetch(query),
+                (set(), set())
+            )
+        else:
+            return set(), set()
 
     async def any_id_exists(self, ids: Iterable[str]):
         return await self.conn.fetchval(self.Query.exist(ids))
