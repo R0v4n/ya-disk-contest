@@ -1,8 +1,8 @@
 from dataclasses import dataclass
+from typing import Iterable
 
 from deepdiff import DeepDiff
 from sqlalchemy.engine import Connection
-from rich import print
 from cloud.model import ItemType
 from cloud.db.schema import imports_table, folders_table, files_table, folder_history, file_history
 from .fake_cloud import FakeCloud
@@ -51,21 +51,37 @@ def direct_import_to_db(connection: Connection, data: dict):
     return import_id
 
 
-def get_history_records(connection: Connection, type_: ItemType):
+def get_history_records(connection: Connection, type_: ItemType, ids: Iterable[str] | None = None):
     """get all records from history table"""
-    table = {ItemType.FOLDER: folder_history, ItemType.FILE: file_history}
-    return [dict(row) for row in connection.execute(table[type_].select())]
+    if type_ == ItemType.FOLDER:
+        table = folder_history
+        col = folder_history.c.folder_id
+    else:
+        table = file_history
+        col = file_history.c.file_id
+
+    query = table.select()
+    if ids:
+        query = query.where(col.in_(list(ids)))
+
+    return [dict(row) for row in connection.execute(query)]
 
 
-def get_node_records(connection: Connection, type_: ItemType):
+def get_node_records(connection: Connection, type_: ItemType, ids: Iterable[str] | None = None):
     """get all records from node table"""
     table = {ItemType.FOLDER: folders_table, ItemType.FILE: files_table}
-    return [dict(row) for row in connection.execute(table[type_].select())]
+    query = table[type_].select()
+    if ids:
+        query = query.where(table[type_].c.id.in_(list(ids)))
+    return [dict(row) for row in connection.execute(query)]
 
 
-def get_imports_records(connection: Connection):
+def get_imports_records(connection: Connection, ids: Iterable[int] | None = None):
     """get all records from imports table"""
-    return [dict(row) for row in connection.execute(imports_table.select())]
+    query = imports_table.select()
+    if ids:
+        query = query.where(imports_table.c.id.in_(list(ids)))
+    return [dict(row) for row in connection.execute(query)]
 
 
 def compare(
@@ -77,8 +93,7 @@ def compare(
         **kwargs):
     diff = DeepDiff(received, expected, ignore_order=ignore_order,
                     report_repetition=report_repetition, verbose_level=1, **kwargs)
-    if assertion_error_note == 'folder history!':
-        print(diff)
+
     assert diff == {}, assertion_error_note
 
 
@@ -102,8 +117,6 @@ def compare_db_fc_state(connection: Connection, fake_cloud: FakeCloud):
     received_file_history = get_history_records(connection, ItemType.FILE)
     received_folder_history = get_history_records(connection, ItemType.FOLDER)
     expected_file_history, expected_folder_history = fake_cloud.get_raw_db_history_records()
-    print(received_folder_history)
-    print(expected_folder_history)
     compare(received_file_history, expected_file_history, 'file history!',
             exclude_regex_paths=r"root\[\d+\]\['import_id'\]")
     compare(received_folder_history, expected_folder_history, 'folder history!',

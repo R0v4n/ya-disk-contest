@@ -25,6 +25,9 @@ class NodeBaseModel(BaseModel):
 
     async def init(self, connection):
         await super().init(connection)
+        await self.find_node()
+
+    async def find_node(self):
         for self._query, self._node_type in zip([FileQuery, FolderQuery], ItemType):
             node_exists = await self.conn.fetchval(self._query.exist(self.node_id))
 
@@ -32,6 +35,12 @@ class NodeBaseModel(BaseModel):
                 return
 
         raise ItemNotFoundError
+
+    async def acquire_locks(self):
+        # await self.acquire_advisory_lock(0)
+        # await self.acquire_advisory_xact_lock_by_ids([self.node_id])
+        await self.conn.execute(self.query.xact_advisory_lock_parent_ids([self.node_id]))
+        # await self.release_advisory_lock(0)
 
 
 class NodeModel(NodeBaseModel):
@@ -67,11 +76,16 @@ class NodeImportModel(BaseImportModel, NodeBaseModel):
         super().__init__(date, node_id)
 
     async def execute_delete_node(self):
-        await self.queue_wait()
+        await self.wait_queue()
         async with self._conn.transaction() as conn:
             self._conn = conn
+            await self.acquire_advisory_lock(0)
+            await self.acquire_advisory_xact_lock_by_ids([self.node_id])
+            await self.find_node()
+            await self.acquire_locks()
+            await self.release_advisory_lock(0)
             await self.insert_import_with_model_id()
-            parents = self.query.recursive_parents(self.node_id)
+            parents = self.query.recursive_parents(self.node_id).select()
             history_q = FolderQuery.insert_history_from_select(parents)
 
             file_id, folder_id = (self.node_id, None) if self.node_type == ItemType.FILE else (None, self.node_id)

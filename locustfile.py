@@ -57,7 +57,7 @@ class User(HttpUser):
         if node_id is None:
             ids = self.cloud.ids
             if ids:
-                node_id = choice(self.cloud.ids)
+                node_id = choice(ids)
 
         if node_id:
             date = self.cloud.del_item(node_id, self.next_import_date())
@@ -112,6 +112,3 @@ class User(HttpUser):
         )
         self.request('GET', path, name='updates')
 
-    # def on_start(self):
-    #     self.cloud.generate_import([[[]]])
-    #     self.request('POST', ImportsView.URL_PATH, json=self.cloud.get_import_dict())

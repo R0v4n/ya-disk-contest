@@ -53,7 +53,7 @@ class QueryToolsMixin:
         return table.c.id.in_(ids)
 
 
-class QueryBase(ABC, QueryToolsMixin):
+class ItemQueryBase(ABC, QueryToolsMixin):
     """Base class for queries"""
 
     table: Table
@@ -80,9 +80,10 @@ class QueryBase(ABC, QueryToolsMixin):
 
     @classmethod
     def update_many(cls, mapping: dict[str, str]):
-        id_param = mapping.pop('id')
+        id_param = mapping['id']
 
-        cols = ', '.join(f'{key}={val}' for key, val in mapping.items())
+        cols = ', '.join(f'{key}={val}' for key, val in mapping.items()
+                         if key != 'id')
 
         return f'UPDATE {cls.table.name} SET {cols} WHERE id = {id_param}'
 
@@ -115,6 +116,7 @@ class QueryBase(ABC, QueryToolsMixin):
     def delete(cls, node_id: str):
         return cls.table.delete().where(cls.table.c.id == node_id)
 
+    # todo: duplicates???
     @classmethod
     def recursive_parents(cls, ids: str | Iterable[str], columns: list[str] = None):
         direct_parents = cls.direct_parents(ids, columns).cte(recursive=True)
@@ -125,7 +127,7 @@ class QueryBase(ABC, QueryToolsMixin):
         parent_folders = direct_parents.union_all(
             select(cls._build_columns(folders_alias, columns)).
             where(folders_alias.c.id == included_alias.c.parent_id)
-        ).select()
+        )
 
         return parent_folders
 
@@ -160,11 +162,16 @@ class QueryBase(ABC, QueryToolsMixin):
     def get_node_select_query(cls, node_id: str):
         """:return: select query for get node API method"""
 
+    @classmethod
+    def xact_advisory_lock_parent_ids(cls, ids: str | Iterable[str]):
+        cte = cls.recursive_parents(ids)
+        return select([func.pg_advisory_xact_lock(func.hashtextextended(cte.c.id, 0))])
 
-QueryT = TypeVar('QueryT', bound=QueryBase)
+
+QueryT = TypeVar('QueryT', bound=ItemQueryBase)
 
 
-class FolderQuery(QueryBase):
+class FolderQuery(ItemQueryBase):
     """Class for folder_table queries"""
 
     table = folders_table
@@ -283,54 +290,8 @@ class FolderQuery(QueryBase):
 
         return query
 
-    @classmethod
-    def insert_history(cls, ids):
-        return f"""WITH RECURSIVE anon_1(import_id, id, parent_id, size) AS
-                   (SELECT folders.import_id AS import_id,
-                           folders.id        AS id,
-                           folders.parent_id AS parent_id,
-                           folders.size      AS size
-                    FROM folders
-                    WHERE folders.id IN ({', '.join(f"'{i}'" for i in ids)})
-                    UNION ALL
-                    SELECT folders_1.import_id AS import_id,
-                           folders_1.id        AS id,
-                           folders_1.parent_id AS parent_id,
-                           folders_1.size      AS size
-                    FROM folders AS folders_1,
-                         anon_1 AS anon_2
-                    WHERE folders_1.id = anon_2.parent_id)
-                    INSERT
-                    INTO folder_history (import_id, folder_id, parent_id, size)
-                    SELECT import_id, id, parent_id, size
-                    FROM (SELECT anon_1.import_id,
-                                 anon_1.id,
-                                 anon_1.parent_id,
-                                 anon_1.size,
-                                 pg_advisory_xact_lock(hashtextextended(anon_1.id, 0))
-                          FROM anon_1) as tmp"""
 
-    @classmethod
-    def lock_rows(cls, ids):
-        return f"""WITH RECURSIVE anon_1(import_id, id, parent_id, size) AS
-                   (SELECT folders.import_id AS import_id,
-                           folders.id        AS id,
-                           folders.parent_id AS parent_id,
-                           folders.size      AS size
-                    FROM folders
-                    WHERE folders.id IN ({', '.join(f"'{i}'" for i in ids)})
-                    UNION ALL
-                    SELECT folders_1.import_id AS import_id,
-                           folders_1.id        AS id,
-                           folders_1.parent_id AS parent_id,
-                           folders_1.size      AS size
-                    FROM folders AS folders_1,
-                         anon_1 AS anon_2
-                    WHERE folders_1.id = anon_2.parent_id)
-SELECT pg_advisory_xact_lock(hashtextextended(anon_1.id, 0)) FROM anon_1"""
-
-
-class FileQuery(QueryBase):
+class FileQuery(ItemQueryBase):
     """Class for file_table queries"""
 
     table = files_table

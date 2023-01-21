@@ -22,16 +22,14 @@ class ImportModel(BaseImportModel):
         self.data = data
         super().__init__(data.date)
 
-        self.files_mdl: FileListModel | None = None
-        self.folders_mdl: FolderListModel | None = None
+        self.folders_mdl = FolderListModel(self.data)
+        self.files_mdl = FileListModel(self.data)
 
     async def init_sub_models(self):
 
-        self.folders_mdl = FolderListModel(self.data, self.import_id, self.conn)
-        await self.folders_mdl.init()
+        await self.folders_mdl.init(self.conn, self.import_id)
 
-        self.files_mdl = FileListModel(self.data, self.import_id, self.conn)
-        await self.files_mdl.init()
+        await self.files_mdl.init(self.conn, self.import_id)
 
         if await self.files_mdl.any_id_exists(self.folders_mdl.ids):
             raise ModelValidationError('Some folder ids already exists in files ids')
@@ -64,35 +62,35 @@ class ImportModel(BaseImportModel):
         ids_set -= {None}
 
         await self.folders_mdl.write_history(ids_set)
-
-    def updated_folders_ids(self):
-        # all folders and their new direct parents (4), (3)
-        ids_set = reduce(set.union, ({i.id, i.parent_id} for i in self.folders_mdl.nodes), set())
-        # union files new parents (3)
-        ids_set |= {i.parent_id for i in self.files_mdl.nodes}
-        # union files old parents (1), (2)
-        ids_set |= self.files_mdl.existent_parent_ids
-        # diff new folder
-        ids_set -= self.folders_mdl.new_ids
-        # diff "root id"
-        ids_set -= {None}
-        return ids_set
-
+    
+    async def acquire_locks(self):
+        await self.acquire_advisory_lock(0)
+        
+        folder_ids_set = reduce(
+            set.union,
+            ({i.id, i.parent_id} for i in self.folders_mdl.nodes),
+            set()
+        )
+        folder_ids_set |= {item.parent_id for item in self.files_mdl.nodes}
+        folder_ids_set -= {None}
+        await self.acquire_advisory_xact_lock_by_ids(self.files_mdl.ids | folder_ids_set)
+        await self.conn.execute(FileQuery.xact_advisory_lock_parent_ids(self.files_mdl.ids))
+        await self.conn.execute(FolderQuery.xact_advisory_lock_parent_ids(folder_ids_set))
+        await self.release_advisory_lock(0)
+        
     async def execute_post_import(self):
-        await self.queue_wait()
+        await self.wait_queue()
 
         async with self._conn.transaction() as conn:
             self._conn = conn
+
+            await self.acquire_locks()
+
             await self.insert_import_with_model_id()
             await self.init_sub_models()
-            ids = self.updated_folders_ids()
-            if ids:
-                await self.conn.execute(
-                    self.folders_mdl.Query.lock_rows(
-                        ids
-                    ))
+
+            # write history
             await self.write_folders_history()
-            # write files history
             await self.files_mdl.write_history(self.files_mdl.existent_ids)
             # subtract  parent sizes
             await self.folders_mdl.update_parent_sizes(
@@ -116,18 +114,18 @@ class ImportModel(BaseImportModel):
 class NodeListBaseModel(ABC):
     NodeT: ItemType
     Query: type[QueryT]
+    field_mapping: dict[str, str]
 
-    __slots__ = ('import_id', 'conn', 'date', 'nodes', 'ids',
+    __slots__ = ('import_id', 'conn', 'nodes', 'ids',
                  '_new_ids', '_existent_ids', '_existent_parent_ids')
 
-    def __init__(self, data: RequestImport, import_id: int,
-                 conn: SAConnection):
-        self.import_id = import_id
-        self.conn = conn
-        self.date = data.date
+    def __init__(self, data: RequestImport):
 
         self.nodes = [i for i in data.items if i.type == self.NodeT]
         self.ids = {node.id for node in self.nodes}
+
+        self.import_id = None
+        self.conn = None
         self._new_ids = None
         self._existent_ids = None
         self._existent_parent_ids = None
@@ -144,7 +142,9 @@ class NodeListBaseModel(ABC):
     def existent_parent_ids(self) -> set[str]:
         return self._existent_parent_ids
 
-    async def init(self):
+    async def init(self, conn: SAConnection, import_id: int):
+        self.conn = conn
+        self.import_id = import_id
         self._existent_ids, self._existent_parent_ids = await self.get_existing_ids()
         self._new_ids = self.ids - self.existent_ids
 
@@ -173,20 +173,20 @@ class NodeListBaseModel(ABC):
 
     async def update_existent(self):
         if self.existent_ids:
-            mapping = {
-                key: f'${i}'
-                for i, key in enumerate(RequestItem.db_fields_set(self.NodeT) | {'import_id'}, start=1)
-            }
 
-            rows = [
-                [node.db_dict(self.import_id)[key] for key in mapping]
+            nodes_gen = (
+                node.db_dict(self.import_id)
                 for node in self.nodes
                 if node.id in self.existent_ids
+            )
+
+            rows = [
+                [node[key] for key in self.field_mapping]
+                for node in nodes_gen
             ]
 
             try:
-                await self.conn.executemany(self.Query.update_many(mapping), rows)
-            # note: this can be a problem if FK error will be raised due to node id.
+                await self.conn.executemany(self.Query.update_many(self.field_mapping), rows)
             except ForeignKeyViolationError as err:
                 raise ParentNotFoundError(err.detail or '')
 
@@ -198,6 +198,10 @@ class NodeListBaseModel(ABC):
 class FileListModel(NodeListBaseModel):
     NodeT = ItemType.FILE
     Query = FileQuery
+    field_mapping = {
+        key: f'${i}'
+        for i, key in enumerate(RequestItem.db_fields_set(NodeT) | {'import_id'}, start=1)
+    }
 
     __slots__ = ()
 
@@ -219,6 +223,10 @@ class FileListModel(NodeListBaseModel):
 class FolderListModel(NodeListBaseModel):
     NodeT = ItemType.FOLDER
     Query = FolderQuery
+    field_mapping = {
+        key: f'${i}'
+        for i, key in enumerate(RequestItem.db_fields_set(NodeT) | {'import_id'}, start=1)
+    }
 
     __slots__ = ()
 
@@ -234,12 +242,10 @@ class FolderListModel(NodeListBaseModel):
     async def write_history(self, ids: Iterable[str]):
         """write  folder table records with given ids and all their recursive parents to history table"""
         if ids:
-            # folders_select = self.Query.select(ids)
-            # parents = self.Query.recursive_parents(ids)
-            # insert_hist = self.Query.insert_history_from_select(folders_select.union(parents))
-            # await self.conn.execute(insert_hist)
-            q = self.Query.insert_history(ids)
-            await self.conn.execute(q)
+            folders_select = self.Query.select(ids)
+            parents = self.Query.recursive_parents(ids).select()
+            insert_hist = self.Query.insert_history_from_select(folders_select.union(parents))
+            await self.conn.execute(insert_hist)
 
     async def update_parent_sizes(self, child_files_ids: Iterable[str],
                                   child_folders_ids: Iterable[str], sign: Sign = Sign.ADD):

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 from random import randint, shuffle, choice, uniform
 
@@ -24,7 +25,7 @@ async def test(api_client, sync_connection):
     check_count = n
     check_period = n // check_count
 
-    for step in range(1, n+1):
+    for step in range(1, n + 1):
         fake_cloud.random_import(schemas_count=3)
         fake_cloud.random_updates(count=4)
 
@@ -70,4 +71,55 @@ async def test(api_client, sync_connection):
                 debug(step)
                 debug(import_data)
                 debug(fake_cloud.get_tree())
+                raise
+
+
+@pytest.mark.slow
+async def test_concurrent(api_client, sync_connection):
+    fake_cloud = FakeCloudGen()
+
+    fake_cloud.random_import()
+    import_data = fake_cloud.get_import_dict()
+
+    await post_import(api_client, import_data)
+
+    n = 100
+    check_count = n
+    check_period = n // check_count
+
+    for step in range(1, n + 1):
+        corus = []
+        for _ in range(randint(1, 4)):
+            fake_cloud.random_import(schemas_count=3)
+            fake_cloud.random_updates(count=4)
+
+            import_data = fake_cloud.get_import_dict()
+            shuffle(import_data['items'])
+
+            corus.append(post_import(api_client, import_data))
+
+        for _ in range(randint(0, 3)):
+            id_, date = fake_cloud.random_del()
+            if id_:
+                corus.append(del_node(api_client, id_, date))
+
+        await asyncio.gather(*corus)
+
+        if step % check_period == 0:
+            try:
+                compare_db_fc_state(sync_connection, fake_cloud)
+
+            except AssertionError:
+                debug(step)
+                debug(import_data)
+                top_folders = []
+                for i in fake_cloud.folder_ids:
+                    if fake_cloud.get_node_copy(i).parent_id is None:
+                        top_folders.append(i)
+                for i in top_folders:
+                    debug(fake_cloud.get_tree(i))
+
+                for i in top_folders:
+                    debug(await get_node(api_client, i))
+                print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                 raise

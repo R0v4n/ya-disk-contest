@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
-from functools import partial
+from functools import partial, reduce
 from itertools import groupby
 from typing import Any, Callable
 from uuid import UUID
 
 import faker
 import pydantic as pdt
+from orjson import orjson
 
 from cloud.model import ItemType
-
 
 fake = faker.Faker(use_weighting=False)
 rnd = fake.random
@@ -522,7 +522,6 @@ default_schema_gen = partial(random_schema, max_files_in_one_folder=5, max_depth
 
 
 class FakeCloudGen(FakeCloud):
-
     __slots__ = ('_write_history',)
 
     def __init__(self, write_history=True):
@@ -591,3 +590,82 @@ class FakeCloudGen(FakeCloud):
             return i, self.del_item(i)
         else:
             return None, None
+
+
+class DataWriter:
+    def __init__(self, fn: str = None, import_weight: int = 7):
+        self.cloud = FakeCloudGen(False)
+        self.fn = fn or 'cloud_data.json'
+        self.import_weight = import_weight
+
+    def make_dataset(self):
+        self.cloud.random_import(
+            schemas_count=2,
+            allow_random_count=True
+        )
+        self.cloud.random_updates(count=5, allow_random_count=True)
+        return self.cloud.get_import_dict()
+
+    def delete_node(self, node_id: str):
+        date = self.cloud.del_item(node_id)
+
+        return {
+            'deleted_id': node_id,
+            'updateDate': date.isoformat()
+        }
+
+    def write(self, n: int, **kwargs):
+        with open(self.fn, 'w+b') as f:
+            f.write(b'{"imports": [\n')
+            f.write(orjson.dumps(self.make_dataset(), **kwargs))
+
+            c = 0
+            while c < n - 1:
+
+                coin = rnd.randint(0, self.import_weight)
+
+                if coin:
+                    f.write(b',\n')
+                    f.write(orjson.dumps(self.make_dataset(), **kwargs))
+
+                else:
+                    ids = self.cloud.ids
+                    if ids:
+                        f.write(b',\n')
+                        f.write(orjson.dumps(self.delete_node(rnd.choice(ids)), **kwargs))
+                    else:
+                        continue
+                c += 1
+
+                if c % 100 == 0:
+                    print(f'{int((c + 1) / n * 100)}%')
+
+            f.write(b'\n]}')
+
+    def load(self):
+        with open(self.fn, 'r+b') as f:
+            return orjson.loads(f.read())
+
+
+if __name__ == '__main__':
+    from rich import print
+
+    dw = DataWriter()
+    dw.write(1000)
+
+    data = dw.load()
+    print(len(reduce(set.union,
+                     [
+                         {item['id'] for item in rec['items']
+                          if item['type'] == 'FOLDER' and item['parentId'] is None}
+                         for rec in data['imports'] if 'items' in rec
+                     ], set()
+                     )))
+
+    print(len(reduce(set.union,
+                     [
+                         {item['id'] for item in rec['items']
+                          if item['type'] == 'FILE' and item['parentId'] is None}
+                         for rec in data['imports'] if 'items' in rec
+                     ], set()
+                     )))

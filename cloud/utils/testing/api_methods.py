@@ -92,7 +92,6 @@ async def check_response(response: ResponseProxy, expected_status: int):
 
     if expected_status != HTTPStatus.OK:
         error = await response.json()
-        print(error)
         assert error == expected_error_response(expected_status)
 
 
@@ -115,7 +114,7 @@ async def get_node(
         node_id: str,
         expected_status: int | Enum = HTTPStatus.OK,
         path: str = url_paths.GET_NODE,
-        **request_kwargs) -> list[dict] | None:
+        **request_kwargs) -> dict[str, Any] | None:
 
     res = await client.get(
         url_for(path, dict(node_id=node_id)),

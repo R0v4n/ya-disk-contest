@@ -1,5 +1,7 @@
+import logging
 import asyncio
 from datetime import datetime
+from typing import Iterable
 
 from asyncpgsa.connection import SAConnection
 
@@ -8,6 +10,9 @@ from .query_builder import (
     insert_import_query, insert_queue_query, insert_import_from_mdl_query,
     get_oldest_queue_id, delete_queue
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class BaseModel:
@@ -25,6 +30,18 @@ class BaseModel:
         if self._conn is None:
             raise NotInitializedError(f'{self.__class__.__name__}.init needs to be called first.')
         return self._conn
+
+    async def acquire_advisory_xact_lock_by_ids(self, ids: Iterable[str]):
+        if ids:
+            query = 'VALUES '
+            query += ', '.join(f"(pg_advisory_xact_lock(hashtextextended('{i}', 0)))" for i in ids)
+            await self.conn.execute(query)
+
+    async def acquire_advisory_lock(self, i: int):
+        await self.conn.execute('SELECT pg_advisory_lock($1)', i)
+
+    async def release_advisory_lock(self, i: int):
+        await self.conn.execute('SELECT pg_advisory_unlock($1)', i)
 
 
 class BaseImportModel(BaseModel):
@@ -60,36 +77,33 @@ class BaseImportModel(BaseModel):
             raise NotInitializedError(f'{self.__class__.__name__}.insert_queue needs to be called first.')
         return self._queue_id
 
-    async def acquire_imports_table_lock(self):
-        await self.conn.execute('LOCK TABLE imports IN SHARE ROW EXCLUSIVE MODE;')
-
-    async def acquire_lock(self, ids: list[str]):
-        text_query = 'VALUES '
-        text_query += ', '.join(f"(pg_advisory_xact_lock(hashtextextended('{i}', 0)))" for i in ids)
-        await self.conn.execute(text_query)
-
     # note: not used
     async def insert_import(self):
-        # await self.acquire_imports_table_lock()
         self._import_id = await self.conn.fetchval(insert_import_query(self.date))
 
-    # note: lock imports table!
     async def insert_import_with_model_id(self):
-        # await self.acquire_imports_table_lock()
         await self.conn.execute(insert_import_from_mdl_query(self._import_id, self._date))
 
     async def insert_queue(self):
         self._queue_id = await self.conn.fetchval(insert_queue_query(self.date))
 
     # note: this method is just my adhoc experiment to handle simultaneous imports requests.
-    #  Another way is to create full import data queue table. But it is a lot of work to do
-    #  (need refactor ImportModel and queries) and it doesn't make sense for me to do it right now.
-    async def queue_wait(self):
+    #  Another way i assume is external control process that takes the oldest record from queue
+    #  and tells /imports handler to run.
+    #  And i have no idea how to implement this =) (especially with several workers)
+    async def wait_queue(self):
         await self.insert_queue()
+        await asyncio.sleep(0.02)
+        t = 0
         while True:
-            await asyncio.sleep(0.05)
             oldest_queue_id = await self.conn.fetchval(get_oldest_queue_id())
+            t += 1
             if oldest_queue_id == self._queue_id:
                 self._import_id = oldest_queue_id
+                logger.debug(
+                    'handler for import with id=%s sent %s queue waiting query to db.',
+                    oldest_queue_id, t
+                )
                 await self.conn.execute(delete_queue(oldest_queue_id))
                 return
+            await asyncio.sleep(0.003)

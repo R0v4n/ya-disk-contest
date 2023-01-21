@@ -38,7 +38,7 @@ async def imports(mdl: model.ImportModel = Depends(), pg: PG = Depends(get_pg)):
     response_class=Response,
 )
 async def delete_node(mdl: model.NodeImportModel = Depends(), pg: PG = Depends(get_pg)):
-    await mdl.init(pg)
+    mdl._conn = pg
     await mdl.execute_delete_node()
 
     return Response()
