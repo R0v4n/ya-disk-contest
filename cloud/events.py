@@ -1,7 +1,7 @@
 import logging
 from typing import Callable
 
-from asyncpgsa import PG
+from asyncpgsa import pg
 from yarl import URL
 
 from .settings import Settings
@@ -13,7 +13,7 @@ async def startup_pg(app, settings: Settings, set_pg_attr: Callable):
     db_info = URL(settings.pg_dsn).with_password('***')
     logger.info('Connecting to database: %s', db_info)
 
-    pg = PG()
+    # pg = PG()
     await pg.init(
         str(settings.pg_dsn),
         min_size=settings.pg_pool_min_size,

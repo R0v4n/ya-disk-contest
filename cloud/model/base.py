@@ -7,10 +7,9 @@ from asyncpgsa.connection import SAConnection
 
 from .exceptions import NotInitializedError, ModelValidationError
 from .query_builder import (
-    insert_import_query, insert_queue_query, insert_import_from_mdl_query,
-    get_oldest_queue_id, delete_queue
+    insert_import_query, insert_queue_query, insert_import_from_mdl_query
 )
-
+from cloud.api_fastapi.events import tasks_set, events
 
 logger = logging.getLogger(__name__)
 
@@ -88,22 +87,17 @@ class BaseImportModel(BaseModel):
         self._queue_id = await self.conn.fetchval(insert_queue_query(self.date))
 
     # note: this method is just my adhoc experiment to handle simultaneous imports requests.
-    #  Another way i assume is external control process that takes the oldest record from queue
-    #  and tells /imports handler to run.
-    #  And i have no idea how to implement this =) (especially with several workers)
     async def wait_queue(self):
         await self.insert_queue()
         await asyncio.sleep(0.02)
-        t = 0
-        while True:
-            oldest_queue_id = await self.conn.fetchval(get_oldest_queue_id())
-            t += 1
-            if oldest_queue_id == self._queue_id:
-                self._import_id = oldest_queue_id
-                logger.info(
-                    'handler for import with id=%s sent %s queue waiting query to db.',
-                    oldest_queue_id, t
-                )
-                await self.conn.execute(delete_queue(oldest_queue_id))
-                return
-            await asyncio.sleep(0.003)
+
+        self._import_id = self._queue_id
+        event = asyncio.Event()
+        events[self._queue_id] = event
+        waiter_task = asyncio.create_task(event.wait())
+        waiter_task.add_done_callback(tasks_set.discard)
+        tasks_set.add(waiter_task)
+
+        await waiter_task
+
+

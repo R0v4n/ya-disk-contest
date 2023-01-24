@@ -7,7 +7,7 @@ from cloud.settings import Settings
 from cloud.utils.arguments_parse import clear_environ
 
 from .errors import add_error_handlers
-from .events import configure_logging
+from .events import configure_logging, queue_worker_event
 from .routers import router
 
 
@@ -31,6 +31,8 @@ def create_app(settings: Settings = None):
         'shutdown',
         partial(shutdown_pg, app, settings, lambda app: app.state.pg)
     )
+
+    app.add_event_handler('startup', queue_worker_event)
 
     app.include_router(router)
 
