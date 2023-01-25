@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     api_address: IPvAnyAddress = '0.0.0.0'
     api_port: conint(gt=0, lt=2 ** 16) = 8081
     api_workers: conint(gt=0, le=os.cpu_count()) = cpu_count
+    sleep: float = 0.01
 
     pg_dsn: PostgresDsn = 'postgresql://user:psw@localhost:5432/cloud'
     pg_pool_min_size: int = 10
@@ -48,12 +49,14 @@ class Settings(BaseSettings):
             'IPv4/IPv6 address API server would listen on',
             'TCP port API server would listen on',
             'API client process count (default is the number of CPUs in the system)',
+            'Queue worker sleep time in seconds',
             'URL to use to connect to the database',
             'Minimum database connections',
             'Maximum database connections'
         ]
 
         groups = [
+            'API options',
             'API options',
             'API options',
             'API options',

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
-from functools import partial, reduce
+from functools import partial
 from itertools import groupby
 from typing import Any, Callable
 from uuid import UUID
@@ -434,8 +434,6 @@ class FakeCloud:
     def _add_new_import_obj(self, date: datetime | None):
         if date is None:
             date = datetime.now(timezone.utc)
-            # note: this can be an issue in some cases
-            #  (e.g. some datetime.now added manually, after generating future datetime)
             if self._imports and self._imports[-1].date >= date:
                 date = self._imports[-1].date + timedelta(microseconds=1)
 
@@ -552,8 +550,10 @@ class FakeCloudGen(FakeCloud):
                 is_new=False
             )
 
-    def random_update(self):
-        ids = set(self.ids) - self._imports[-1].items.keys()
+    def random_update(self, excluded_ids: set[str] = None):
+        if excluded_ids is None:
+            excluded_ids = set()
+        ids = set(self.ids) - self._imports[-1].items.keys() - excluded_ids
         id_ = rnd.choice(tuple(ids))
         item = self._items[id_]
 
@@ -572,8 +572,10 @@ class FakeCloudGen(FakeCloud):
             updates = rnd.choices(updates, k=rnd.randint(1, 3))
             self.update_item(id_, **dict(updates))
 
-    def random_updates(self, *, count=2, allow_random_count=True):
-        items_count = len(self._items) - 1 - len(self._imports[-1].items)
+    def random_updates(self, *, count=2, allow_random_count=True, excluded_ids: set[str] = None):
+        if excluded_ids is None:
+            excluded_ids = set()
+        items_count = len(self._items.keys() - excluded_ids) - 1 - len(self._imports[-1].items)
 
         if allow_random_count:
             count = rnd.randint(0, count)
@@ -581,7 +583,7 @@ class FakeCloudGen(FakeCloud):
         count = min(items_count, count)
 
         for _ in range(count):
-            self.random_update()
+            self.random_update(excluded_ids)
 
     def random_del(self):
         ids = self.ids
@@ -646,26 +648,3 @@ class DataWriter:
         with open(self.fn, 'r+b') as f:
             return orjson.loads(f.read())
 
-
-if __name__ == '__main__':
-    from rich import print
-
-    dw = DataWriter()
-    dw.write(1000)
-
-    data = dw.load()
-    print(len(reduce(set.union,
-                     [
-                         {item['id'] for item in rec['items']
-                          if item['type'] == 'FOLDER' and item['parentId'] is None}
-                         for rec in data['imports'] if 'items' in rec
-                     ], set()
-                     )))
-
-    print(len(reduce(set.union,
-                     [
-                         {item['id'] for item in rec['items']
-                          if item['type'] == 'FILE' and item['parentId'] is None}
-                         for rec in data['imports'] if 'items' in rec
-                     ], set()
-                     )))

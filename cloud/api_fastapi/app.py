@@ -1,6 +1,7 @@
 from functools import partial
 
 from fastapi import FastAPI
+from rich import print
 
 from cloud.events import startup_pg, shutdown_pg
 from cloud.settings import Settings
@@ -32,7 +33,7 @@ def create_app(settings: Settings = None):
         partial(shutdown_pg, app, settings, lambda app: app.state.pg)
     )
 
-    app.add_event_handler('startup', queue_worker_event)
+    app.add_event_handler('startup', partial(queue_worker_event, settings.sleep))
 
     app.include_router(router)
 

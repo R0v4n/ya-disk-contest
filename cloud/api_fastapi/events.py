@@ -7,7 +7,6 @@ from asyncpgsa import pg
 from cloud.model.query_builder import get_oldest_queue_id, delete_queue
 from cloud.settings import Settings
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -27,12 +26,14 @@ events: dict[int, asyncio.Event] = {}
 
 # todo: cancel task on shutdown
 # fixme: older queue table record may broke app. clear!
-async def queue_worker(conn):
+async def queue_worker(conn, sleep=0.01):
     counter = 0
     request_counter = 0
+    period = int(10 / sleep) if sleep > 0 else 100000
+
     while True:
         counter += 1
-        if counter % 1000 == 0:
+        if counter % period == 0:
             logger.info('Queue worker listening')
         if events:
             i = await conn.fetchval(get_oldest_queue_id())
@@ -44,13 +45,14 @@ async def queue_worker(conn):
                 await conn.execute(delete_queue(i))
                 logger.info('Queue worker sent %d requests to db looking for %d', request_counter, i)
                 request_counter = 0
-        else:
-            await asyncio.sleep(0.01)
+
+        await asyncio.sleep(sleep)
+
 
 worker = None
 
 
-def queue_worker_event():
+def queue_worker_event(sleep=0.01):
     global worker
-    worker = asyncio.create_task(queue_worker(pg))
+    worker = asyncio.create_task(queue_worker(pg, sleep))
     logger.info('Queue worker started')

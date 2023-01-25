@@ -83,13 +83,13 @@ async def test_concurrent(api_client, sync_connection):
 
     await post_import(api_client, import_data)
 
-    n = 100
+    n = 50
     check_count = n
     check_period = n // check_count
 
     for step in range(1, n + 1):
         corus = []
-        for _ in range(randint(1, 4)):
+        for _ in range(4):
             fake_cloud.random_import(schemas_count=3)
             fake_cloud.random_updates(count=4)
 
@@ -98,7 +98,7 @@ async def test_concurrent(api_client, sync_connection):
 
             corus.append(post_import(api_client, import_data))
 
-        for _ in range(randint(0, 3)):
+        for _ in range(3):
             id_, date = fake_cloud.random_del()
             if id_:
                 corus.append(del_node(api_client, id_, date))
@@ -121,5 +121,4 @@ async def test_concurrent(api_client, sync_connection):
 
                 for i in top_folders:
                     debug(await get_node(api_client, i))
-                print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                 raise

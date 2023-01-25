@@ -11,7 +11,7 @@ from rich import print
 
 def _typer_type(value: Any):
     """Typer by default handles int, bool, str, Enum and some others"""
-    if type(value) in (int, bool, str) or isinstance(value, Enum):
+    if type(value) in (int, float, bool, str) or isinstance(value, Enum):
         return type(value)
     else:
         return str
