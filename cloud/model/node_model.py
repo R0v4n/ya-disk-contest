@@ -4,7 +4,8 @@ from .base import BaseImportModel, BaseModel
 from .exceptions import ModelValidationError, ItemNotFoundError
 from .schemas import ItemType, ListResponseItem
 from .node_tree import ResponseNodeTree
-from .query_builder import FileQuery, FolderQuery, Sign, QueryT
+from .queries import FileQuery, FolderQuery, QueryT, import_queries
+from cloud.utils.pg import advisory_lock
 
 
 class NodeBaseModel(BaseModel):
@@ -25,9 +26,9 @@ class NodeBaseModel(BaseModel):
 
     async def init(self, connection):
         await super().init(connection)
-        await self.find_node()
+        await self.define_node_type()
 
-    async def find_node(self):
+    async def define_node_type(self):
         for self._query, self._node_type in zip([FileQuery, FolderQuery], ItemType):
             node_exists = await self.conn.fetchval(self._query.exist(self.node_id))
 
@@ -35,12 +36,6 @@ class NodeBaseModel(BaseModel):
                 return
 
         raise ItemNotFoundError
-
-    async def acquire_locks(self):
-        # await self.acquire_advisory_lock(0)
-        # await self.acquire_advisory_xact_lock_by_ids([self.node_id])
-        await self.conn.execute(self.query.xact_advisory_lock_parent_ids([self.node_id]))
-        # await self.release_advisory_lock(0)
 
 
 class NodeModel(NodeBaseModel):
@@ -77,19 +72,23 @@ class NodeImportModel(BaseImportModel, NodeBaseModel):
 
     async def execute_delete_node(self):
         await self.wait_queue()
+
         async with self._conn.transaction() as conn:
             self._conn = conn
-            await self.acquire_advisory_lock(0)
-            await self.acquire_advisory_xact_lock_by_ids([self.node_id])
-            await self.find_node()
-            await self.acquire_locks()
-            await self.release_advisory_lock(0)
-            await self.insert_import_with_model_id()
+            async with advisory_lock(self.conn, 0):
+                await self.acquire_advisory_xact_lock_by_ids([self.node_id])
+                await self.define_node_type()
+                await self.conn.execute(self.query.xact_advisory_lock_parent_ids([self.node_id]))
+
+            await self.insert_import()
             parents = self.query.recursive_parents(self.node_id).select()
             history_q = FolderQuery.insert_history_from_select(parents)
 
             file_id, folder_id = (self.node_id, None) if self.node_type == ItemType.FILE else (None, self.node_id)
-            update_q = FolderQuery.update_parent_sizes(file_id, folder_id, self.import_id, Sign.SUB)
+            update_q = import_queries.update_parent_sizes(
+                file_id, folder_id, self.import_id,
+                import_queries.Sign.SUB
+            )
 
             await self.conn.execute(history_q)
             await self.conn.execute(update_q)

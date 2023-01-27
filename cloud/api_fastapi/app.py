@@ -1,12 +1,10 @@
 from functools import partial
 
 from fastapi import FastAPI
-from rich import print
 
 from cloud.events import startup_pg, shutdown_pg
 from cloud.settings import Settings
 from cloud.utils.arguments_parse import clear_environ
-
 from .errors import add_error_handlers
 from .events import configure_logging, queue_worker_event
 from .routers import router

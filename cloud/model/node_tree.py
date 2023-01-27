@@ -45,9 +45,9 @@ class ResponseNodeTree(ResponseItem, NodeTree):
 class RequestNodeTree(RequestItem, NodeTree):
     children: list[RequestNodeTree] | None = None
 
-    def flatten_nodes_dict_gen(self, import_id: int):
+    def flatten_nodes(self, import_id: int) -> list[dict[str, Any]]:
         """
-        Return Generator[dict] for insertion records in db.
+        Return nodes list for insertion records in db.
         Children field not included.
         Any child always will be after his parent.
         """
@@ -58,5 +58,5 @@ class RequestNodeTree(RequestItem, NodeTree):
                 for child in node.children:
                     yield from get_dict(child)
 
-        return get_dict(self)
+        return list(get_dict(self))
 

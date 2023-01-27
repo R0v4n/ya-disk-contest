@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from argparse import Namespace
@@ -27,3 +28,13 @@ def make_alembic_config(cmd_opts: SimpleNamespace | Namespace, base_path: str | 
         config.set_main_option('sqlalchemy.url', cmd_opts.pg_dsn)
 
     return config
+
+
+@asynccontextmanager
+async def advisory_lock(conn, i: int):
+    try:
+        await conn.execute('SELECT pg_advisory_lock($1)', i)
+        yield
+    finally:
+        await conn.execute('SELECT pg_advisory_unlock($1)', i)
+

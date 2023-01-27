@@ -61,7 +61,7 @@ class DelayImportModel(model.ImportModel):
 
 
 class NoLocksImportModel(DelayImportModel):
-    async def acquire_locks(self):
+    async def acquire_ids_locks(self):
         """do nothing"""
 
 
@@ -361,3 +361,35 @@ async def test_insert_and_del(api_client, fake_cloud, sync_connection, url, stat
     await asyncio.gather(c1, c2)
     if status == HTTPStatus.OK:
         compare_db_fc_state(sync_connection, fake_cloud)
+
+
+async def test_insert(api_client, fake_cloud, sync_connection):
+    """
+    without lock delete node handler will not see item from previous import.
+    """
+    fake_cloud.generate_import(1)
+    file = fake_cloud[0]
+    c1 = post_import(api_client, fake_cloud.get_import_dict())
+
+    fake_cloud.generate_import()
+    fake_cloud.update_item(file.id, size=10)
+    c2 = post_import(api_client, fake_cloud.get_import_dict())
+
+    await asyncio.gather(c1, c2)
+    compare_db_fc_state(sync_connection, fake_cloud)
+
+
+async def test_many(api_client, sync_connection):
+    fake_cloud = FakeCloudGen()
+    n = 20
+    for _ in range(n):
+        fake_cloud.random_import(schemas_count=3, allow_random_count=False)
+        fake_cloud.random_updates(allow_random_count=False)
+
+    imports = [fake_cloud.get_import_dict(i) for i in range(-n, 0)]
+
+    corus = [post_import(api_client, data) for data in imports]
+
+    await asyncio.gather(*corus)
+    compare_db_fc_state(sync_connection, fake_cloud)
+    print(fake_cloud.get_tree())

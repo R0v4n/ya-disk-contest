@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from .base import BaseModel
 from .schemas import ItemType, ListResponseItem
-from .query_builder import FileQuery
+from .queries import FileQuery
 
 
 class HistoryModel(BaseModel):

@@ -4,7 +4,7 @@ import logging
 from aiomisc_log import basic_config, LogFormat, create_logging_handler
 from asyncpgsa import pg
 
-from cloud.model.query_builder import get_oldest_queue_id, delete_queue
+from cloud.model.queries.import_queries import get_oldest_queue_id, delete_queue
 from cloud.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ events: dict[int, asyncio.Event] = {}
 
 
 # todo: cancel task on shutdown
-# fixme: older queue table record may broke app. clear!
+# fixme: older queue table record may break app. clear!
 async def queue_worker(conn, sleep=0.01):
     counter = 0
     request_counter = 0

@@ -6,9 +6,7 @@ from typing import Iterable
 from asyncpgsa.connection import SAConnection
 
 from .exceptions import NotInitializedError, ModelValidationError
-from .query_builder import (
-    insert_import_query, insert_queue_query, insert_import_from_mdl_query
-)
+from .queries import import_queries
 from cloud.api_fastapi.events import tasks_set, events
 
 logger = logging.getLogger(__name__)
@@ -36,23 +34,16 @@ class BaseModel:
             query += ', '.join(f"(pg_advisory_xact_lock(hashtextextended('{i}', 0)))" for i in ids)
             await self.conn.execute(query)
 
-    async def acquire_advisory_lock(self, i: int):
-        await self.conn.execute('SELECT pg_advisory_lock($1)', i)
-
-    async def release_advisory_lock(self, i: int):
-        await self.conn.execute('SELECT pg_advisory_unlock($1)', i)
-
 
 class BaseImportModel(BaseModel):
 
-    __slots__ = ('_date', '_import_id', '_queue_id')
+    __slots__ = ('_date', '_import_id')
 
     def __init__(self, date: datetime, *args):
         super().__init__(*args)
 
         self.date = date
         self._import_id = None
-        self._queue_id = None
 
     @property
     def date(self) -> datetime:
@@ -70,34 +61,33 @@ class BaseImportModel(BaseModel):
             raise NotInitializedError(f'{self.__class__.__name__}.insert_import needs to be called first.')
         return self._import_id
 
-    @property
-    def queue_id(self) -> int:
-        if self._queue_id is None:
-            raise NotInitializedError(f'{self.__class__.__name__}.insert_queue needs to be called first.')
-        return self._queue_id
+    @import_id.setter
+    def import_id(self, value: int):
+        self._import_id = value
 
     # note: not used
-    async def insert_import(self):
-        self._import_id = await self.conn.fetchval(insert_import_query(self.date))
+    async def insert_import_auto_id(self):
+        self._import_id = await self.conn.fetchval(
+            import_queries.insert_import_auto_id(self.date))
 
-    async def insert_import_with_model_id(self):
-        await self.conn.execute(insert_import_from_mdl_query(self._import_id, self._date))
+    async def insert_import(self):
+        await self.conn.execute(
+            import_queries.insert_import(self._import_id, self._date))
 
     async def insert_queue(self):
-        self._queue_id = await self.conn.fetchval(insert_queue_query(self.date))
+        self._import_id = await self.conn.fetchval(
+            import_queries.insert_queue(self.date))
 
     # note: this method is just my adhoc experiment to handle simultaneous imports requests.
     async def wait_queue(self):
+        # todo: move logic outside
         await self.insert_queue()
-        await asyncio.sleep(0.02)
+        await asyncio.sleep(0.05)
 
-        self._import_id = self._queue_id
         event = asyncio.Event()
-        events[self._queue_id] = event
+        events[self._import_id] = event
         waiter_task = asyncio.create_task(event.wait())
         waiter_task.add_done_callback(tasks_set.discard)
         tasks_set.add(waiter_task)
 
         await waiter_task
-
-
