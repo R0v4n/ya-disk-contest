@@ -1,13 +1,12 @@
 import logging
-import asyncio
 from datetime import datetime
-from typing import Iterable
+from typing import Iterable, Coroutine
 
 from asyncpgsa.connection import SAConnection
 
 from .exceptions import NotInitializedError, ModelValidationError
-from .queries import import_queries
-from cloud.api_fastapi.events import tasks_set, events
+from cloud.queries import import_queries
+from cloud.utils import QueueWorker
 
 logger = logging.getLogger(__name__)
 
@@ -74,20 +73,11 @@ class BaseImportModel(BaseModel):
         await self.conn.execute(
             import_queries.insert_import(self._import_id, self._date))
 
-    async def insert_queue(self):
-        self._import_id = await self.conn.fetchval(
-            import_queries.insert_queue(self.date))
+    async def _execute_in_import_transaction(self, coro: Coroutine):
+        async with QueueWorker(self._date) as qw:
+            self._import_id = qw.queue_id
 
-    # note: this method is just my adhoc experiment to handle simultaneous imports requests.
-    async def wait_queue(self):
-        # todo: move logic outside
-        await self.insert_queue()
-        await asyncio.sleep(0.05)
-
-        event = asyncio.Event()
-        events[self._import_id] = event
-        waiter_task = asyncio.create_task(event.wait())
-        waiter_task.add_done_callback(tasks_set.discard)
-        tasks_set.add(waiter_task)
-
-        await waiter_task
+            async with self.conn.transaction() as conn:
+                self._conn = conn
+                await coro
+                self._conn = None

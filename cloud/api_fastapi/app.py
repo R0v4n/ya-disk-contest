@@ -2,12 +2,15 @@ from functools import partial
 
 from fastapi import FastAPI
 
-from cloud.events import startup_pg, shutdown_pg
+from cloud.utils import startup_pg, shutdown_pg, clear_environ, QueueWorker
 from cloud.settings import Settings
-from cloud.utils.arguments_parse import clear_environ
 from .errors import add_error_handlers
-from .events import configure_logging, queue_worker_event
+from .config_logging import configure_logging
 from .routers import router
+
+
+async def queue_worker_startup_event(app, settings):
+    await QueueWorker.startup(app.state.pg, settings.sleep)
 
 
 def create_app(settings: Settings = None):
@@ -24,14 +27,14 @@ def create_app(settings: Settings = None):
     app.add_event_handler(
         'startup',
         partial(startup_pg, app, settings,
-                lambda app, pg: setattr(app.state, 'pg', pg))
+                lambda ap, pg: setattr(ap.state, 'pg', pg))
     )
     app.add_event_handler(
         'shutdown',
-        partial(shutdown_pg, app, settings, lambda app: app.state.pg)
+        partial(shutdown_pg, app, settings, lambda ap: ap.state.pg)
     )
 
-    app.add_event_handler('startup', partial(queue_worker_event, settings.sleep))
+    app.add_event_handler('startup', partial(queue_worker_startup_event, app, settings))
 
     app.include_router(router)
 

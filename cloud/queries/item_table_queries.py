@@ -5,8 +5,7 @@ from typing import Iterable, Any, TypeVar
 from sqlalchemy import Table, select, func, exists, literal_column, String
 from sqlalchemy.sql.elements import Null
 
-from cloud.db.schema import files_table, folder_history, folders_table, file_history, imports_table
-from cloud.model.schemas import ItemType
+from cloud.db.schema import files_table, folder_history, folders_table, file_history, imports_table, ItemType
 from .tools import build_columns, ids_condition
 
 

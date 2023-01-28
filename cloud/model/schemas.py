@@ -1,12 +1,8 @@
 from datetime import datetime
-from enum import Enum
 
 import pydantic as pdt
 
-
-class ItemType(Enum):
-    FILE = 'FILE'
-    FOLDER = 'FOLDER'
+from cloud.db.schema import ItemType
 
 
 class Item(pdt.BaseModel):

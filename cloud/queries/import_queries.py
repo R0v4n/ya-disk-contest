@@ -29,6 +29,10 @@ def delete_queue(id_: int):
     return queue_table.delete().where(queue_table.c.id == id_)
 
 
+def clear_queue():
+    return queue_table.delete()
+
+
 def lock_ids_from_select(cte):
     return select([func.pg_advisory_xact_lock(func.hashtextextended(cte.c.id, 0))])
 

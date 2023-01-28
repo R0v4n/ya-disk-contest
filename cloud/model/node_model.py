@@ -4,8 +4,8 @@ from .base import BaseImportModel, BaseModel
 from .exceptions import ModelValidationError, ItemNotFoundError
 from .schemas import ItemType, ListResponseItem
 from .node_tree import ResponseNodeTree
-from .queries import FileQuery, FolderQuery, QueryT, import_queries
-from cloud.utils.pg import advisory_lock
+from cloud.queries import FileQuery, FolderQuery, QueryT, import_queries
+from cloud.utils import advisory_lock, QueueWorker
 
 
 class NodeBaseModel(BaseModel):
@@ -70,26 +70,27 @@ class NodeImportModel(BaseImportModel, NodeBaseModel):
     def __init__(self, node_id: str, date: datetime):
         super().__init__(date, node_id)
 
+    async def _delete_node(self):
+        async with advisory_lock(self.conn, 0):
+            QueueWorker.release_queue(self.import_id)
+
+            await self.acquire_advisory_xact_lock_by_ids([self.node_id])
+            await self.define_node_type()
+            await self.conn.execute(self.query.xact_advisory_lock_parent_ids([self.node_id]))
+
+        await self.insert_import()
+        parents = self.query.recursive_parents(self.node_id).select()
+        history_q = FolderQuery.insert_history_from_select(parents)
+
+        file_id, folder_id = (self.node_id, None) if self.node_type == ItemType.FILE else (None, self.node_id)
+        update_q = import_queries.update_parent_sizes(
+            file_id, folder_id, self.import_id,
+            import_queries.Sign.SUB
+        )
+
+        await self.conn.execute(history_q)
+        await self.conn.execute(update_q)
+        await self.conn.execute(self.query.delete(self.node_id))
+
     async def execute_delete_node(self):
-        await self.wait_queue()
-
-        async with self._conn.transaction() as conn:
-            self._conn = conn
-            async with advisory_lock(self.conn, 0):
-                await self.acquire_advisory_xact_lock_by_ids([self.node_id])
-                await self.define_node_type()
-                await self.conn.execute(self.query.xact_advisory_lock_parent_ids([self.node_id]))
-
-            await self.insert_import()
-            parents = self.query.recursive_parents(self.node_id).select()
-            history_q = FolderQuery.insert_history_from_select(parents)
-
-            file_id, folder_id = (self.node_id, None) if self.node_type == ItemType.FILE else (None, self.node_id)
-            update_q = import_queries.update_parent_sizes(
-                file_id, folder_id, self.import_id,
-                import_queries.Sign.SUB
-            )
-
-            await self.conn.execute(history_q)
-            await self.conn.execute(update_q)
-            await self.conn.execute(self.query.delete(self.node_id))
+        await self._execute_in_import_transaction(self._delete_node())

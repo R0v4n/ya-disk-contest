@@ -1,7 +1,14 @@
+from enum import Enum
+
 from sqlalchemy import (
     Column, DateTime, ForeignKey, ForeignKeyConstraint,
     Integer, BigInteger, String, Table, MetaData
 )
+
+
+class ItemType(Enum):
+    FILE = 'FILE'
+    FOLDER = 'FOLDER'
 
 
 convention = {

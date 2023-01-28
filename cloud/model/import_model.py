@@ -3,9 +3,9 @@ from functools import reduce
 from .base import BaseImportModel
 from .exceptions import ModelValidationError
 from .item_list_model import FileListModel, FolderListModel
-from .queries import FolderQuery, import_queries
+from cloud.queries import FolderQuery, import_queries
 from .schemas import RequestImport
-from cloud.utils.pg import advisory_lock
+from cloud.utils import advisory_lock, QueueWorker
 
 
 # todo: clean WHERE 1!=1
@@ -54,11 +54,11 @@ class ImportModel(BaseImportModel):
     async def acquire_ids_locks(self):
         """locks all updating folder branches by involved folder ids and also all import items ids"""
         async with advisory_lock(self.conn, 0):
-            # todo: release queue here?
+            QueueWorker.release_queue(self.import_id)
+
             await self.acquire_advisory_xact_lock_by_ids(
                 self.files_mdl.ids | self.folder_ids_set
             )
-            # todo: prepare statement?
             cte = import_queries.folders_with_recursive_parents_cte(
                 self.folder_ids_set,
                 self.files_mdl.ids,
@@ -103,31 +103,27 @@ class ImportModel(BaseImportModel):
         )
         await self.conn.execute(query)
 
-    async def execute_post_import(self):
-        await self.wait_queue()
-
+    async def _post_import(self):
         if self.data.items:
-            async with self.conn.transaction() as conn:
-                self._conn = conn
+            await self.acquire_ids_locks()
+            await self.insert_import()
+            await self.init_sub_models()
 
-                await self.acquire_ids_locks()
-                await self.insert_import()
-                await self.init_sub_models()
+            # write history
+            await self.write_folders_history()
+            await self.files_mdl.write_history(self.files_mdl.existent_ids)
 
-                # write history
-                await self.write_folders_history()
-                await self.files_mdl.write_history(self.files_mdl.existent_ids)
+            await self.subtract_parent_sizes()
+            # insert new nodes
+            await self.folders_mdl.insert_new(),
+            await self.files_mdl.insert_new(),
+            # update existent nodes
+            await self.folders_mdl.update_existent(),
+            await self.files_mdl.update_existent(),
 
-                await self.subtract_parent_sizes()
-                # insert new nodes
-                await self.folders_mdl.insert_new(),
-                await self.files_mdl.insert_new(),
-                # update existent nodes
-                await self.folders_mdl.update_existent(),
-                await self.files_mdl.update_existent(),
-
-                await self.add_parent_sizes()
+            await self.add_parent_sizes()
         else:
             await self.insert_import()
 
-
+    async def execute_post_import(self):
+        await self._execute_in_import_transaction(self._post_import())

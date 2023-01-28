@@ -8,7 +8,7 @@ from .schemas import ItemType, RequestImport, RequestItem
 from .base import BaseImportModel
 from .exceptions import ParentNotFoundError
 from .node_tree import RequestNodeTree
-from .queries import QueryT, FileQuery, FolderQuery
+from cloud.queries import QueryT, FileQuery, FolderQuery
 
 
 class ItemListBaseModel(ABC, BaseImportModel):
