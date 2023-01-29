@@ -4,22 +4,20 @@ from typing import Iterable, Any
 from asyncpg import ForeignKeyViolationError
 from asyncpgsa.connection import SAConnection
 
-from .schemas import ItemType, RequestImport, RequestItem
-from .base import BaseImportModel
+from cloud.queries import QueryT, FileQuery, FolderQuery
 from .exceptions import ParentNotFoundError
 from .node_tree import RequestNodeTree
-from cloud.queries import QueryT, FileQuery, FolderQuery
+from .schemas import ItemType, RequestImport, RequestItem
 
 
-class ItemListBaseModel(ABC, BaseImportModel):
+class ItemListBaseModel(ABC):
     NodeT: ItemType
     Query: type[QueryT]
     field_mapping: dict[str, str]
 
-    __slots__ = ('nodes', 'ids', '_new_ids', '_existent_ids')
+    __slots__ = ('nodes', 'ids', '_conn', '_import_id', '_new_ids', '_existent_ids')
 
     def __init__(self, data: RequestImport):
-        super().__init__(data.date)
 
         self.nodes: dict[str, RequestItem] = {
             item.id: item for item in data.items
@@ -27,8 +25,22 @@ class ItemListBaseModel(ABC, BaseImportModel):
         }
         self.ids = set(self.nodes.keys())
 
+        self._conn = None
+        self._import_id = None
         self._new_ids = None
         self._existent_ids = None
+
+    @property
+    def conn(self) -> SAConnection:
+        return self._conn
+
+    @property
+    def import_id(self) -> int:
+        return self._import_id
+
+    @import_id.setter
+    def import_id(self, value: int):
+        self._import_id = value
 
     @property
     def new_ids(self) -> set[str]:
@@ -39,7 +51,7 @@ class ItemListBaseModel(ABC, BaseImportModel):
         return self._existent_ids
 
     async def init(self, conn: SAConnection):
-        await super().init(conn)
+        self._conn = conn
         self._existent_ids = await self._get_existent_ids()
         self._new_ids = self.ids - self.existent_ids
 
@@ -100,9 +112,9 @@ class FileListModel(ItemListBaseModel):
             for i in self.new_ids
         ]
 
-    async def write_history(self, ids: Iterable[str]):
-        if ids:
-            select_q = self.Query.select(ids)
+    async def write_history(self):
+        if self.existent_ids:
+            select_q = self.Query.select(self.existent_ids)
             insert_hist = self.Query.insert_history_from_select(select_q)
 
             await self.conn.execute(insert_hist)

@@ -2,6 +2,7 @@ import logging
 import asyncio
 from datetime import datetime
 
+from asyncpg import UndefinedTableError
 from asyncpgsa import PG
 
 from cloud.queries import import_queries
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 class QueueWorker:
     """this class is just my adhoc experiment to handle simultaneous imports requests."""
 
+    # todo: test task set
     _tasks_set: set[asyncio.Task] = set()
     _wait_queue_events: dict[int, asyncio.Event] = {}
     _release_queue_events: dict[int, asyncio.Event] = {}
@@ -40,7 +42,10 @@ class QueueWorker:
     @classmethod
     async def startup(cls, pg: PG, sleep_time: float):
         cls._pg = pg
-        await pg.execute(import_queries.clear_queue())
+        try:
+            await pg.execute(import_queries.clear_queue())
+        except UndefinedTableError:
+            pass
         cls._worker_task = asyncio.create_task(cls.run(sleep_time))
         logger.info('Queue worker started')
 
@@ -70,23 +75,23 @@ class QueueWorker:
             await asyncio.sleep(sleep_time)
 
     @classmethod
-    async def join_queue(cls, date):
+    async def join_queue(cls, date: datetime):
         queue_id = await cls._insert_queue(date)
         await asyncio.sleep(0.05)
         await cls._wait_event(queue_id, cls._wait_queue_events)
         return queue_id
 
     @classmethod
-    def release_queue(cls, queue_id):
+    def release_queue(cls, queue_id: int):
         cls._release_queue_events.pop(queue_id).set()
 
     @classmethod
-    async def _insert_queue(cls, date) -> int:
+    async def _insert_queue(cls, date: datetime) -> int:
         queue_id = await cls._pg.fetchval(import_queries.insert_queue(date))
         return queue_id
 
     @classmethod
-    async def _wait_event(cls, i, events_dict: dict[int, asyncio.Event]):
+    async def _wait_event(cls, i: int, events_dict: dict[int, asyncio.Event]):
         event = asyncio.Event()
         events_dict[i] = event
         waiter_task = asyncio.create_task(event.wait())
@@ -106,6 +111,6 @@ class QueueWorker:
             return queue_id
 
     @classmethod
-    async def _leave_queue(cls, queue_id):
+    async def _leave_queue(cls, queue_id: int):
         await cls._wait_event(queue_id, cls._release_queue_events)
         await cls._pg.execute(import_queries.delete_queue(queue_id))

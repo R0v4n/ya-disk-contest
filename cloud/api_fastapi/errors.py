@@ -50,14 +50,6 @@ async def model_error_handler(
     return error_response(exc.status_code, messages.get(exc.status_code))
 
 
-async def unhandled_error_handler(
-    _: Request,
-    __: Exception,
-) -> JSONResponse:
-    logger.exception('Unhandled exception')
-    return error_response(HTTPStatus.INTERNAL_SERVER_ERROR)
-
-
 def add_error_handlers(app: FastAPI):
 
     app.add_exception_handler(RequestValidationError, http422_error_handler)
@@ -66,7 +58,6 @@ def add_error_handlers(app: FastAPI):
         app.add_exception_handler(exception, model_error_handler)
 
     app.add_exception_handler(HTTPException, http_error_handler)
-    app.add_exception_handler(Exception, unhandled_error_handler)
 
 
 __all__ = 'add_error_handlers',

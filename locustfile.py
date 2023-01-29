@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
-from random import choice, uniform
+from random import choice, uniform, randint
 
 from locust import task, FastHttpUser, constant, events
 from locust.runners import MasterRunner
@@ -21,7 +21,7 @@ def on_test_start(environment, **_kwargs):
 
 class User(FastHttpUser):
 
-    wait_time = constant(0.2)
+    wait_time = constant(1)
 
     cloud: FakeCloudGen
     all_instances_last_import_ids: set[str]
@@ -67,7 +67,7 @@ class User(FastHttpUser):
         ) as resp:
             if resp.status_code != expected_status:
                 resp.failure(f'expected status {expected_status}, '
-                             f'got {resp.status_code} import id={self.cloud._imports[-1].id}')
+                             f'got {resp.status_code}')
 
             logging.info(
                 '%s: %s, http status %d (expected %d)',
@@ -75,50 +75,58 @@ class User(FastHttpUser):
             )
             return resp
 
-    @task(7)
+    @task(6)
     def post_import(self):
-        self.cloud.random_import(schemas_count=2)
-        self.cloud.random_updates(count=5, allow_random_count=False, excluded_ids=self.root_ids)
+        coin = randint(0, 2)
+        if coin:
+            self.cloud.random_import(schemas_count=1, allow_random_count=False)
+        else:
+            self.cloud.generate_import()
+            self.cloud.random_updates(count=3, allow_random_count=False, excluded_ids=self.root_ids)
 
         data = self.cloud.get_import_dict()
 
         self.last_import_ids = {i['id'] for i in data['items']}
-        # print('POST last import ids:')
-        # print(self.last_import_ids)
 
         print(f'POST: date={data["updateDate"]}')
         self.request('POST', url_paths.IMPORTS, json=data)
 
-    @task(1)
-    def delete_node(self):
-        ids = tuple(set(self.cloud.ids) - self.root_ids)
+    def delete_node(self, ids, **req_kwargs):
+        if not isinstance(ids, tuple):
+            ids = tuple(ids)
+
         if ids:
             node_id = choice(ids)
-
             date = self.cloud.del_item(node_id)
             path = url_for(url_paths.DELETE_NODE, {'node_id': node_id}, {'date': date})
             print(f'DELETE: date={date}')
 
-            self.request('DELETE', path, name=url_paths.DELETE_NODE)
+            self.request('DELETE', path, **req_kwargs)
+
+    @task(1)
+    def delete_folder(self):
+        self.delete_node(set(self.cloud.folder_ids) - self.root_ids, name='delete folder')
+
+    @task(5)
+    def delete_file(self):
+        self.delete_node(self.cloud.file_ids, name='delete file')
 
     def get_node(self, ids: list[str] | tuple[str], **req_kwargs):
-        # print('GET NODE, _last import ids:')
-        # print(self._last_import_ids)
         ids = tuple(set(ids) - self.all_instances_last_import_ids)
-        # print('ids:', ids)
         if ids:
             node_id = choice(ids)
-
             path = url_for(url_paths.GET_NODE, {'node_id': node_id})
+            print(f'{req_kwargs["name"].upper()}: id={node_id} ')
+
             self.request('GET', path, **req_kwargs)
 
-    @task(14)
+    @task(20)
     def get_folder(self):
-        self.get_node(self.cloud.folder_ids, name='get_folder')
+        self.get_node(self.cloud.folder_ids, name='get folder')
 
-    @task(2)
+    @task(4)
     def get_file(self):
-        self.get_node(self.cloud.file_ids, name='get_file')
+        self.get_node(self.cloud.file_ids, name='get file')
 
     def get_node_history(self, ids, **req_kwargs):
         ids = tuple(set(ids) - self.all_instances_last_import_ids)
@@ -138,17 +146,17 @@ class User(FastHttpUser):
             )
             self.request('GET', path, **req_kwargs)
 
-    @task(14)
+    @task(20)
     def get_folder_history(self):
-        self.get_node_history(self.cloud.folder_ids, name='get_folder_history')
+        self.get_node_history(self.cloud.folder_ids, name='get folder history')
 
-    @task(2)
+    @task(4)
     def get_file_history(self):
-        self.get_node_history(self.cloud.file_ids, name='get_file_history')
+        self.get_node_history(self.cloud.file_ids, name='get file history')
 
-    @task(16)
+    @task(24)
     def get_updates(self):
-        date = self.cloud.last_import_date + timedelta(hours=23, minutes=59, seconds=59)
+        date = self.cloud.last_import_date + timedelta(hours=23, minutes=59, seconds=58)
 
         print('GET UPDATES:', date)
 

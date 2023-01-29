@@ -3,6 +3,7 @@ services:
 
   db:
     image: postgres
+    shm_size: 1g
     command:
       - "postgres"
       - "-c"

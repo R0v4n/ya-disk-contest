@@ -8,6 +8,7 @@ from .schemas import RequestImport
 from cloud.utils import advisory_lock, QueueWorker
 
 
+# todo: refactor connection
 # todo: clean WHERE 1!=1
 # Should this class be named ImportService?
 class ImportModel(BaseImportModel):
@@ -17,14 +18,13 @@ class ImportModel(BaseImportModel):
 
     def __init__(self, data: RequestImport):
 
-        self.data = data
         super().__init__(data.date)
 
-        self.folders_mdl = FolderListModel(self.data)
-        self.files_mdl = FileListModel(self.data)
+        self.folders_mdl = FolderListModel(data)
+        self.files_mdl = FileListModel(data)
         self._folder_ids_set = None
 
-    async def init_sub_models(self):
+    async def init_models(self):
         await self.folders_mdl.init(self.conn)
         self.folders_mdl.import_id = self.import_id
         await self.files_mdl.init(self.conn)
@@ -53,6 +53,7 @@ class ImportModel(BaseImportModel):
 
     async def acquire_ids_locks(self):
         """locks all updating folder branches by involved folder ids and also all import items ids"""
+        # todo: try remove advisory_lock and release queue after locking ids
         async with advisory_lock(self.conn, 0):
             QueueWorker.release_queue(self.import_id)
 
@@ -104,16 +105,17 @@ class ImportModel(BaseImportModel):
         await self.conn.execute(query)
 
     async def _post_import(self):
-        if self.data.items:
+        await self.insert_import()
+        if self.files_mdl.nodes or self.folders_mdl.nodes:
             await self.acquire_ids_locks()
-            await self.insert_import()
-            await self.init_sub_models()
+            await self.init_models()
 
             # write history
             await self.write_folders_history()
-            await self.files_mdl.write_history(self.files_mdl.existent_ids)
+            await self.files_mdl.write_history()
 
             await self.subtract_parent_sizes()
+
             # insert new nodes
             await self.folders_mdl.insert_new(),
             await self.files_mdl.insert_new(),
@@ -122,8 +124,6 @@ class ImportModel(BaseImportModel):
             await self.files_mdl.update_existent(),
 
             await self.add_parent_sizes()
-        else:
-            await self.insert_import()
 
     async def execute_post_import(self):
         await self._execute_in_import_transaction(self._post_import())
