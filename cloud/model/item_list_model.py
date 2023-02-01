@@ -5,42 +5,28 @@ from asyncpg import ForeignKeyViolationError
 from asyncpgsa.connection import SAConnection
 
 from cloud.queries import QueryT, FileQuery, FolderQuery
+from .base_model import BaseModel
 from .exceptions import ParentNotFoundError
 from .node_tree import RequestNodeTree
-from .schemas import ItemType, RequestImport, RequestItem
+from .schemas import ItemType, RequestItem
 
 
-class ItemListBaseModel(ABC):
+class ItemListBaseModel(ABC, BaseModel):
     NodeT: ItemType
     Query: type[QueryT]
     field_mapping: dict[str, str]
 
-    __slots__ = ('nodes', 'ids', '_conn', '_import_id', '_new_ids', '_existent_ids')
+    __slots__ = ('nodes', 'ids', '_new_ids', '_existent_ids')
 
-    def __init__(self, data: RequestImport):
+    def __init__(self, conn: SAConnection, nodes: dict[str, RequestItem]):
 
-        self.nodes: dict[str, RequestItem] = {
-            item.id: item for item in data.items
-            if item.type == self.NodeT
-        }
+        super().__init__(conn)
+
+        self.nodes: dict[str, RequestItem] = nodes
         self.ids = set(self.nodes.keys())
 
-        self._conn = None
-        self._import_id = None
         self._new_ids = None
         self._existent_ids = None
-
-    @property
-    def conn(self) -> SAConnection:
-        return self._conn
-
-    @property
-    def import_id(self) -> int:
-        return self._import_id
-
-    @import_id.setter
-    def import_id(self, value: int):
-        self._import_id = value
 
     @property
     def new_ids(self) -> set[str]:
@@ -50,8 +36,7 @@ class ItemListBaseModel(ABC):
     def existent_ids(self) -> set[str]:
         return self._existent_ids
 
-    async def init(self, conn: SAConnection):
-        self._conn = conn
+    async def init(self):
         self._existent_ids = await self._get_existent_ids()
         self._new_ids = self.ids - self.existent_ids
 
@@ -66,22 +51,22 @@ class ItemListBaseModel(ABC):
     async def any_id_exists(self, ids: Iterable[str]):
         return await self.conn.fetchval(self.Query.exist(ids))
 
-    async def insert_new(self):
+    async def insert_new(self, import_id: int):
         if self.new_ids:
             try:
-                await self.conn.execute(self.Query.insert(self._get_new_nodes_records()))
+                await self.conn.execute(self.Query.insert(self._get_new_nodes_records(import_id)))
             except ForeignKeyViolationError as err:
                 raise ParentNotFoundError(err.detail or '')
 
     @abstractmethod
-    def _get_new_nodes_records(self) -> list[dict[str, Any]]:
+    def _get_new_nodes_records(self, import_id: int) -> list[dict[str, Any]]:
         """new nodes db dicts"""
 
-    async def update_existent(self):
+    async def update_existent(self, import_id: int):
         if self.existent_ids:
 
             nodes_gen = (
-                self.nodes[i].db_dict(self.import_id)
+                self.nodes[i].db_dict(import_id)
                 for i in self.existent_ids
             )
 
@@ -106,9 +91,9 @@ class FileListModel(ItemListBaseModel):
 
     __slots__ = ()
 
-    def _get_new_nodes_records(self):
+    def _get_new_nodes_records(self, import_id: int):
         return [
-            self.nodes[i].db_dict(self.import_id)
+            self.nodes[i].db_dict(import_id)
             for i in self.new_ids
         ]
 
@@ -130,8 +115,8 @@ class FolderListModel(ItemListBaseModel):
 
     __slots__ = ()
 
-    def _get_new_nodes_records(self):
+    def _get_new_nodes_records(self, import_id: int):
         new_folders = (self.nodes[i] for i in self.new_ids)
         folder_trees = RequestNodeTree.from_nodes(new_folders)
-        ordered_folders = sum((tree.flatten_nodes(self.import_id) for tree in folder_trees), [])
+        ordered_folders = sum((tree.flatten_nodes(import_id) for tree in folder_trees), [])
         return ordered_folders

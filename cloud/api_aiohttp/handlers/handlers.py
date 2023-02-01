@@ -3,6 +3,7 @@ from datetime import datetime
 from aiohttp.web_response import Response
 from aiohttp_pydantic.oas.typing import r200, r404, r400
 
+import cloud.model.node_model
 from cloud import model
 from cloud.resources import url_paths
 from .base import PydanticView
@@ -10,7 +11,7 @@ from .base import PydanticView
 
 class ImportsView(PydanticView):
     URL_PATH = url_paths.IMPORTS
-    ModelT = model.ImportModel
+    ModelT = model.ImportService
 
     async def post(self, data: model.RequestImport) -> r200 | r400[model.Error]:
         """
@@ -63,7 +64,7 @@ class NodeView(PydanticView):
             400: Невалидная схема документа или входные данные не верны.
             404: Элемент не найден.
         """
-        mdl = model.NodeModel(node_id)
+        mdl = cloud.model.node_model.NodeModel(node_id)
         await mdl.init(self.pg)
         node = (await mdl.get_node()).dict(by_alias=True)
         return Response(body=node)
@@ -71,7 +72,7 @@ class NodeView(PydanticView):
 
 class DeleteNodeView(PydanticView):
     URL_PATH = url_paths.DELETE_NODE
-    ModelT = model.NodeImportModel
+    ModelT = model.NodeImportService
 
     async def delete(
             self,
@@ -106,7 +107,7 @@ class UpdatesView(PydanticView):
             200: Список элементов, которые были обновлены.
             400: Невалидная схема документа или входные данные не верны
         """
-        mdl = model.HistoryModel(date)
+        mdl = model.HistoryService(date)
         await mdl.init(self.pg)
         items = await mdl.get_files_updates()
 
@@ -132,7 +133,7 @@ class NodeHistoryView(PydanticView):
             400: Невалидная схема документа или входные данные не верны.
             404: Элемент не найден.
         """
-        mdl = model.NodeModel(node_id)
+        mdl = cloud.model.node_model.NodeModel(node_id)
         await mdl.init(self.pg)
         items = await mdl.get_node_history(dateStart, dateEnd)
 

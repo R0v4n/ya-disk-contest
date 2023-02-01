@@ -4,6 +4,7 @@ from asyncpgsa import PG
 from fastapi import APIRouter, status, Request, Depends
 from fastapi.responses import Response, ORJSONResponse
 
+import cloud.model.node_model
 from cloud import model
 from cloud.resources import url_paths
 
@@ -26,7 +27,7 @@ def get_pg(request: Request) -> PG:
 
 
 @router.post(url_paths.IMPORTS, response_class=Response)
-async def imports(mdl: model.ImportModel = Depends(), pg: PG = Depends(get_pg)):
+async def imports(mdl: model.ImportService = Depends(), pg: PG = Depends(get_pg)):
     await mdl.init(pg)
     await mdl.execute_post_import()
 
@@ -37,7 +38,7 @@ async def imports(mdl: model.ImportModel = Depends(), pg: PG = Depends(get_pg)):
     url_paths.DELETE_NODE,
     response_class=Response,
 )
-async def delete_node(mdl: model.NodeImportModel = Depends(), pg: PG = Depends(get_pg)):
+async def delete_node(mdl: model.NodeImportService = Depends(), pg: PG = Depends(get_pg)):
     mdl._conn = pg
     await mdl.execute_delete_node()
 
@@ -49,7 +50,7 @@ async def delete_node(mdl: model.NodeImportModel = Depends(), pg: PG = Depends(g
     response_model=model.ResponseNodeTree,
     response_class=ORJSONResponse
 )
-async def node_tree(mdl: model.NodeModel = Depends(), pg: PG = Depends(get_pg)):
+async def node_tree(mdl: cloud.model.node_model.NodeModel = Depends(), pg: PG = Depends(get_pg)):
     await mdl.init(pg)
     tree = await mdl.get_node()
     return ORJSONResponse(tree.dict(by_alias=True))
@@ -60,7 +61,7 @@ async def node_tree(mdl: model.NodeModel = Depends(), pg: PG = Depends(get_pg)):
     response_model=model.ListResponseItem,
     response_class=ORJSONResponse
 )
-async def updates(mdl: model.HistoryModel = Depends(), pg: PG = Depends(get_pg)):
+async def updates(mdl: model.HistoryService = Depends(), pg: PG = Depends(get_pg)):
     await mdl.init(pg)
     items = await mdl.get_files_updates()
     return ORJSONResponse(items.dict(by_alias=True))
@@ -75,7 +76,7 @@ async def updates(mdl: model.HistoryModel = Depends(), pg: PG = Depends(get_pg))
 async def node_history(
         dateStart: datetime,
         dateEnd: datetime,
-        mdl: model.NodeModel = Depends(),
+        mdl: cloud.model.node_model.NodeModel = Depends(),
         pg: PG = Depends(get_pg)):
 
     await mdl.init(pg)

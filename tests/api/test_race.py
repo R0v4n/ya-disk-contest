@@ -34,12 +34,12 @@ no_locks_delete_node_url = '/no-locks' + url_paths.DELETE_NODE
 # todo: create outer router
 
 
-class NoLocksNodeImportModel(model.NodeImportModel):
+class NoLocksNodeImportModel(model.NodeImportService):
     async def acquire_locks(self):
         """do nothing"""
 
 
-class NoAdvisoryLockImportModel(model.ImportModel):
+class NoAdvisoryLockImportModel(model.ImportService):
     """
     Without these locks the first transaction may not have time to lock all records.
     See test_lock.
@@ -52,7 +52,7 @@ class NoAdvisoryLockImportModel(model.ImportModel):
         """do nothing"""
 
 
-class DelayImportModel(model.ImportModel):
+class DelayImportModel(model.ImportService):
 
     async def write_folders_history(self):
         await super().write_folders_history()

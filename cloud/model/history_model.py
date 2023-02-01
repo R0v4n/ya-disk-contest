@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
 
-from .base import BaseModel
+from .base_service import BaseService
 from .schemas import ItemType, ListResponseItem
 from cloud.queries import FileQuery
 
 
-class HistoryModel(BaseModel):
+class HistoryService(BaseService):
     __slots__ = ('date_end',)
 
     def __init__(self, date: datetime):
@@ -17,7 +17,7 @@ class HistoryModel(BaseModel):
 
         query = FileQuery.select_updates_daterange(date_start, self.date_end)
 
-        res = await self.conn.fetch(query)
+        res = await self.pg.fetch(query)
 
         items = ListResponseItem(items=[{'type': ItemType.FILE, **rec} for rec in res])
         return items

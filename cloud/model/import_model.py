@@ -1,74 +1,50 @@
-from functools import reduce
+from asyncpgsa.connection import SAConnection
 
-from .base import BaseImportModel
-from .exceptions import ModelValidationError
-from .item_list_model import FileListModel, FolderListModel
-from cloud.queries import FolderQuery, import_queries
-from .schemas import RequestImport
+from cloud.model.base_model import BaseImportModel
+from cloud.queries import import_queries, FolderQuery
 from cloud.utils import advisory_lock, QueueWorker
 
 
-# todo: refactor connection
-# todo: clean WHERE 1!=1
-# Should this class be named ImportService?
 class ImportModel(BaseImportModel):
-    """Wraps FolderListModel and FileListModel interfaces in calls to init and execute_post_import methods"""
 
-    __slots__ = ('data', 'files_mdl', 'folders_mdl', '_folder_ids_set')
+    async def init(self):
+        pass
 
-    def __init__(self, data: RequestImport):
+    def __init__(self, conn: SAConnection, files_ids: set[str] = None, folders_ids: set[str] = None):
+        super().__init__(conn)
+        if not files_ids and not folders_ids:
+            raise ValueError('Empty ids')
 
-        super().__init__(data.date)
-
-        self.folders_mdl = FolderListModel(data)
-        self.files_mdl = FileListModel(data)
-        self._folder_ids_set = None
-
-    async def init_models(self):
-        await self.folders_mdl.init(self.conn)
-        self.folders_mdl.import_id = self.import_id
-        await self.files_mdl.init(self.conn)
-        self.files_mdl.import_id = self.import_id
-
-        if await self.files_mdl.any_id_exists(self.folders_mdl.ids):
-            raise ModelValidationError('Some folder ids already exists in files ids')
-        if await self.folders_mdl.any_id_exists(self.files_mdl.ids):
-            raise ModelValidationError('Some file ids already exists in folders ids')
-
-    @property
-    def folder_ids_set(self) -> set[str]:
-        """All folder ids from import items id and parent_id fields diff None parent_id"""
-        # functools.cached_property doesn't work with __slots__
-        if self._folder_ids_set is None:
-            ids = reduce(
-                set.union,
-                ({i.id, i.parent_id} for i in self.folders_mdl.nodes.values()),
-                set()
-            )
-            ids |= {item.parent_id for item in self.files_mdl.nodes.values()}
-            ids -= {None}
-            self._folder_ids_set = ids
-
-        return self._folder_ids_set
+        self._files_ids = files_ids
+        self._folders_ids = folders_ids
 
     async def acquire_ids_locks(self):
+        query = 'VALUES '
+        query += ', '.join(
+            f"(pg_advisory_xact_lock(hashtextextended('{i}', 0)))"
+            for i in self._files_ids | self._folders_ids
+        )
+        await self.conn.execute(query)
+
+    async def lock_branches(self):
         """locks all updating folder branches by involved folder ids and also all import items ids"""
         # todo: try remove advisory_lock and release queue after locking ids
         async with advisory_lock(self.conn, 0):
+            # todo: try release queue with pg
             QueueWorker.release_queue(self.import_id)
 
-            await self.acquire_advisory_xact_lock_by_ids(
-                self.files_mdl.ids | self.folder_ids_set
-            )
+            await self.acquire_ids_locks()
+
             cte = import_queries.folders_with_recursive_parents_cte(
-                self.folder_ids_set,
-                self.files_mdl.ids,
+                self._folders_ids,
+                self._files_ids,
                 ['id', 'parent_id']
             )
             await self.conn.execute(
                 import_queries.lock_ids_from_select(cte)
             )
 
+    # todo: move description
     async def write_folders_history(self):
         """
         Write in folder_history table folder records that will be updated during import:
@@ -81,16 +57,16 @@ class ImportModel(BaseImportModel):
         All records selecting in one recursive query.
         """
         cte = import_queries.folders_with_recursive_parents_cte(
-            self.folder_ids_set, self.files_mdl.ids
+            self._folders_ids, self._files_ids
         )
         insert_hist = FolderQuery.insert_history_from_select(cte.select())
         await self.conn.execute(insert_hist)
 
-    async def subtract_parent_sizes(self):
-        if self.files_mdl.existent_ids or self.folders_mdl.existent_ids:
+    async def subtract_parent_sizes(self, files_existent_ids, folders_existent_ids):
+        if folders_existent_ids or files_existent_ids:
             query = import_queries.update_parent_sizes(
-                self.files_mdl.existent_ids,
-                self.folders_mdl.existent_ids,
+                files_existent_ids,
+                folders_existent_ids,
                 self.import_id,
                 import_queries.Sign.SUB
             )
@@ -98,32 +74,8 @@ class ImportModel(BaseImportModel):
 
     async def add_parent_sizes(self):
         query = import_queries.update_parent_sizes(
-            self.files_mdl.ids,
-            self.folders_mdl.ids,
+            self._files_ids,
+            self._folders_ids,
             self.import_id
         )
         await self.conn.execute(query)
-
-    async def _post_import(self):
-        await self.insert_import()
-        if self.files_mdl.nodes or self.folders_mdl.nodes:
-            await self.acquire_ids_locks()
-            await self.init_models()
-
-            # write history
-            await self.write_folders_history()
-            await self.files_mdl.write_history()
-
-            await self.subtract_parent_sizes()
-
-            # insert new nodes
-            await self.folders_mdl.insert_new(),
-            await self.files_mdl.insert_new(),
-            # update existent nodes
-            await self.folders_mdl.update_existent(),
-            await self.files_mdl.update_existent(),
-
-            await self.add_parent_sizes()
-
-    async def execute_post_import(self):
-        await self._execute_in_import_transaction(self._post_import())
