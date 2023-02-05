@@ -97,6 +97,7 @@ def recursive_parents_with_size(file_ids: Iterable[str] | str | None,
     return all_parents
 
 
+# todo: remove sign?
 def update_parent_sizes(
         file_ids: Iterable[str] | str | None,
         folder_ids: Iterable[str] | str | None,

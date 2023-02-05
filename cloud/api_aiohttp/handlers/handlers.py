@@ -3,7 +3,7 @@ from datetime import datetime
 from aiohttp.web_response import Response
 from aiohttp_pydantic.oas.typing import r200, r404, r400
 
-import cloud.model.node_model
+from cloud import services
 from cloud import model
 from cloud.resources import url_paths
 from .base import PydanticView
@@ -11,7 +11,7 @@ from .base import PydanticView
 
 class ImportsView(PydanticView):
     URL_PATH = url_paths.IMPORTS
-    ModelT = model.ImportService
+    ServiceT = services.ImportService
 
     async def post(self, data: model.RequestImport) -> r200 | r400[model.Error]:
         """
@@ -41,13 +41,8 @@ class ImportsView(PydanticView):
             200: Вставка или обновление прошли успешно.
             400: Невалидная схема документа или входные данные не верны.
         """
-        mdl = self.ModelT(data)
-
-        # fixme: need refactor like in fastapi route
-        async with self.pg.transaction() as conn:
-            await mdl.init(conn)
-            await mdl.execute_post_import()
-
+        service = self.ServiceT(self.pg, data)
+        await service.execute_post_import()
         return Response()
 
 
@@ -64,15 +59,14 @@ class NodeView(PydanticView):
             400: Невалидная схема документа или входные данные не верны.
             404: Элемент не найден.
         """
-        mdl = cloud.model.node_model.NodeModel(node_id)
-        await mdl.init(self.pg)
-        node = (await mdl.get_node()).dict(by_alias=True)
-        return Response(body=node)
+        service = services.NodeService(self.pg, node_id)
+        node = await service.get_node()
+        return Response(body=node.dict(by_alias=True))
 
 
 class DeleteNodeView(PydanticView):
     URL_PATH = url_paths.DELETE_NODE
-    ModelT = model.NodeImportService
+    ServiceT = services.NodeImportService
 
     async def delete(
             self,
@@ -88,10 +82,8 @@ class DeleteNodeView(PydanticView):
             400: Невалидная схема документа или входные данные не верны.
             404: Элемент не найден.
         """
-        mdl = self.ModelT(node_id, date)
-        async with self.pg.transaction() as conn:
-            await mdl.init(conn)
-            await mdl.execute_delete_node()
+        service = self.ServiceT(self.pg, node_id, date)
+        await service.execute_delete_node()
         return Response()
 
 
@@ -107,10 +99,8 @@ class UpdatesView(PydanticView):
             200: Список элементов, которые были обновлены.
             400: Невалидная схема документа или входные данные не верны
         """
-        mdl = model.HistoryService(date)
-        await mdl.init(self.pg)
-        items = await mdl.get_files_updates()
-
+        service = services.HistoryService(self.pg, date)
+        items = await service.get_files_updates()
         return Response(body=items.dict(by_alias=True))
 
 
@@ -133,8 +123,7 @@ class NodeHistoryView(PydanticView):
             400: Невалидная схема документа или входные данные не верны.
             404: Элемент не найден.
         """
-        mdl = cloud.model.node_model.NodeModel(node_id)
-        await mdl.init(self.pg)
-        items = await mdl.get_node_history(dateStart, dateEnd)
+        service = services.NodeService(self.pg, node_id)
+        items = await service.get_node_history(dateStart, dateEnd)
 
         return Response(body=items.dict(by_alias=True))

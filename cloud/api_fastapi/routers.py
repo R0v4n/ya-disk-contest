@@ -1,12 +1,31 @@
 from datetime import datetime
+from inspect import Parameter
 
 from asyncpgsa import PG
 from fastapi import APIRouter, status, Request, Depends
 from fastapi.responses import Response, ORJSONResponse
+from makefun import wraps
 
-import cloud.model.node_model
 from cloud import model
 from cloud.resources import url_paths
+from cloud.services import ImportService, NodeService, NodeImportService, HistoryService
+
+
+def get_pg(request: Request) -> PG:
+    return request.app.state.pg
+
+
+def service_depends(service_class):
+    @wraps(
+        service_class.__init__,
+        remove_args=('pg', 'self'),
+        append_args=Parameter('pg', Parameter.POSITIONAL_OR_KEYWORD,
+                              default=Depends(get_pg), annotation=PG)
+    )
+    def init_service(*args, **kwargs):
+        return service_class(*args, **kwargs)
+
+    return Depends(init_service)
 
 
 router = APIRouter(
@@ -22,15 +41,9 @@ node_router = APIRouter(
 )
 
 
-def get_pg(request: Request) -> PG:
-    return request.app.state.pg
-
-
 @router.post(url_paths.IMPORTS, response_class=Response)
-async def imports(mdl: model.ImportService = Depends(), pg: PG = Depends(get_pg)):
-    await mdl.init(pg)
-    await mdl.execute_post_import()
-
+async def imports(service: ImportService = service_depends(ImportService)):
+    await service.execute_post_import()
     return Response()
 
 
@@ -38,10 +51,8 @@ async def imports(mdl: model.ImportService = Depends(), pg: PG = Depends(get_pg)
     url_paths.DELETE_NODE,
     response_class=Response,
 )
-async def delete_node(mdl: model.NodeImportService = Depends(), pg: PG = Depends(get_pg)):
-    mdl._conn = pg
-    await mdl.execute_delete_node()
-
+async def delete_node(service: NodeImportService = service_depends(NodeImportService)):
+    await service.execute_delete_node()
     return Response()
 
 
@@ -50,9 +61,8 @@ async def delete_node(mdl: model.NodeImportService = Depends(), pg: PG = Depends
     response_model=model.ResponseNodeTree,
     response_class=ORJSONResponse
 )
-async def node_tree(mdl: cloud.model.node_model.NodeModel = Depends(), pg: PG = Depends(get_pg)):
-    await mdl.init(pg)
-    tree = await mdl.get_node()
+async def node_tree(service: NodeService = service_depends(NodeService)):
+    tree = await service.get_node()
     return ORJSONResponse(tree.dict(by_alias=True))
 
 
@@ -61,9 +71,8 @@ async def node_tree(mdl: cloud.model.node_model.NodeModel = Depends(), pg: PG = 
     response_model=model.ListResponseItem,
     response_class=ORJSONResponse
 )
-async def updates(mdl: model.HistoryService = Depends(), pg: PG = Depends(get_pg)):
-    await mdl.init(pg)
-    items = await mdl.get_files_updates()
+async def updates(service: HistoryService = service_depends(HistoryService)):
+    items = await service.get_files_updates()
     return ORJSONResponse(items.dict(by_alias=True))
 
 
@@ -76,11 +85,9 @@ async def updates(mdl: model.HistoryService = Depends(), pg: PG = Depends(get_pg
 async def node_history(
         dateStart: datetime,
         dateEnd: datetime,
-        mdl: cloud.model.node_model.NodeModel = Depends(),
-        pg: PG = Depends(get_pg)):
-
-    await mdl.init(pg)
-    items = await mdl.get_node_history(dateStart, dateEnd)
+        service: NodeService = service_depends(NodeService),
+):
+    items = await service.get_node_history(dateStart, dateEnd)
     return ORJSONResponse(items.dict(by_alias=True))
 
 

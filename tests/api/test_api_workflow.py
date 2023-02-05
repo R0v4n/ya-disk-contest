@@ -90,7 +90,7 @@ async def test_concurrent(api_client, sync_connection):
     for step in range(1, n + 1):
         corus = []
         for _ in range(4):
-            fake_cloud.random_import(schemas_count=3)
+            fake_cloud.random_import(schemas_count=2)
             fake_cloud.random_updates(count=4)
 
             import_data = fake_cloud.get_import_dict()

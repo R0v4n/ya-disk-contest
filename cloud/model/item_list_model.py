@@ -1,17 +1,17 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Iterable, Any
 
 from asyncpg import ForeignKeyViolationError
 from asyncpgsa.connection import SAConnection
 
 from cloud.queries import QueryT, FileQuery, FolderQuery
-from .base_model import BaseModel
+from .base import BaseInitModel
 from .exceptions import ParentNotFoundError
 from .node_tree import RequestNodeTree
 from .schemas import ItemType, RequestItem
 
 
-class ItemListBaseModel(ABC, BaseModel):
+class ItemListBaseModel(BaseInitModel):
     NodeT: ItemType
     Query: type[QueryT]
     field_mapping: dict[str, str]
@@ -22,7 +22,7 @@ class ItemListBaseModel(ABC, BaseModel):
 
         super().__init__(conn)
 
-        self.nodes: dict[str, RequestItem] = nodes
+        self.nodes = nodes
         self.ids = set(self.nodes.keys())
 
         self._new_ids = None

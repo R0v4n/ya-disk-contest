@@ -1,51 +1,67 @@
+from datetime import datetime
+from typing import Iterable
+
 from asyncpgsa.connection import SAConnection
 
-from cloud.model.base_model import BaseImportModel
-from cloud.queries import import_queries, FolderQuery
-from cloud.utils import advisory_lock, QueueWorker
+from cloud.queries import import_queries, FolderQuery, Ids
+from cloud.utils import QueueWorker
+from .base import BaseModel
 
 
-class ImportModel(BaseImportModel):
+class ImportModel(BaseModel):
+    __slots__ = ('_import_id',)
 
-    async def init(self):
-        pass
-
-    def __init__(self, conn: SAConnection, files_ids: set[str] = None, folders_ids: set[str] = None):
+    def __init__(self, conn: SAConnection, import_id: int | None = None):
         super().__init__(conn)
-        if not files_ids and not folders_ids:
-            raise ValueError('Empty ids')
 
-        self._files_ids = files_ids
-        self._folders_ids = folders_ids
+        self._import_id = import_id
 
-    async def acquire_ids_locks(self):
+    @property
+    def import_id(self) -> int:
+        return self._import_id
+
+    @import_id.setter
+    def import_id(self, value: int):
+        self._import_id = value
+
+    # note: not used
+    async def insert_import_auto_id(self, date: datetime):
+        self._import_id = await self.conn.fetchval(
+            import_queries.insert_import_auto_id(date))
+
+    async def insert_import(self, date: datetime):
+        await self.conn.execute(
+            import_queries.insert_import(self.import_id, date))
+
+    def release_queue(self):
+        QueueWorker.release_queue(self.import_id)
+
+    # todo: think about refactor ids types and acquire_ids_locks
+    async def lock_ids(self, ids: Iterable[str]):
         query = 'VALUES '
         query += ', '.join(
             f"(pg_advisory_xact_lock(hashtextextended('{i}', 0)))"
-            for i in self._files_ids | self._folders_ids
+            for i in ids
         )
         await self.conn.execute(query)
 
-    async def lock_branches(self):
-        """locks all updating folder branches by involved folder ids and also all import items ids"""
-        # todo: try remove advisory_lock and release queue after locking ids
-        async with advisory_lock(self.conn, 0):
-            # todo: try release queue with pg
-            QueueWorker.release_queue(self.import_id)
+    async def lock_branches(self, folder_ids, file_ids):
+        """locks old and new parent branches for given ids"""
 
-            await self.acquire_ids_locks()
+        cte = import_queries.folders_with_recursive_parents_cte(
+            folder_ids,
+            file_ids,
+            ['id', 'parent_id']
+        )
+        await self.conn.execute(
+            import_queries.lock_ids_from_select(cte)
+        )
 
-            cte = import_queries.folders_with_recursive_parents_cte(
-                self._folders_ids,
-                self._files_ids,
-                ['id', 'parent_id']
-            )
-            await self.conn.execute(
-                import_queries.lock_ids_from_select(cte)
-            )
+    def acquire_locks_ctx(self, ids: Iterable[str]):
+        return AcquireLocksContext(self, ids)
 
     # todo: move description
-    async def write_folders_history(self):
+    async def write_folders_history(self, folder_ids, file_ids):
         """
         Write in folder_history table folder records that will be updated during import:
             1) new nodes existent parents
@@ -57,12 +73,12 @@ class ImportModel(BaseImportModel):
         All records selecting in one recursive query.
         """
         cte = import_queries.folders_with_recursive_parents_cte(
-            self._folders_ids, self._files_ids
+            folder_ids, file_ids
         )
         insert_hist = FolderQuery.insert_history_from_select(cte.select())
         await self.conn.execute(insert_hist)
 
-    async def subtract_parent_sizes(self, files_existent_ids, folders_existent_ids):
+    async def subtract_parent_sizes(self, folders_existent_ids, files_existent_ids):
         if folders_existent_ids or files_existent_ids:
             query = import_queries.update_parent_sizes(
                 files_existent_ids,
@@ -72,10 +88,41 @@ class ImportModel(BaseImportModel):
             )
             await self.conn.execute(query)
 
-    async def add_parent_sizes(self):
+    async def add_parent_sizes(self, file_ids, folder_ids):
         query = import_queries.update_parent_sizes(
-            self._files_ids,
-            self._folders_ids,
+            file_ids,
+            folder_ids,
             self.import_id
         )
         await self.conn.execute(query)
+
+
+class AcquireLocksContext:
+    __slots__ = ('mdl', 'i', '_ids', '_branches_ids')
+
+    def __init__(self, mdl: ImportModel, ids: Iterable[str], i: int = 0):
+        self.mdl = mdl
+        self.i = i
+        self._ids = ids
+        self._branches_ids = None
+
+    @property
+    def branches_leaf_ids(self) -> tuple[Ids, Ids]:
+        return self._branches_ids
+
+    @branches_leaf_ids.setter
+    def branches_leaf_ids(self, value: tuple[Ids, Ids]):
+        """folder ids, file ids"""
+        self._branches_ids = value
+
+    async def __aenter__(self):
+        await self.mdl.conn.execute('SELECT pg_advisory_lock($1)', self.i)
+        await self.mdl.lock_ids(self._ids)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        try:
+            if exc_type is None:
+                await self.mdl.lock_branches(*self.branches_leaf_ids)
+        finally:
+            await self.mdl.conn.execute('SELECT pg_advisory_unlock($1)', self.i)

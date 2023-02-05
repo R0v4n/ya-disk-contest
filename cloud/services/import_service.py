@@ -3,17 +3,12 @@ from functools import reduce
 from asyncpgsa import PG
 from asyncpgsa.connection import SAConnection
 
-from .base_service import BaseImportService
-from .exceptions import ModelValidationError
-from .import_model import ImportModel
-from .item_list_model import FileListModel, FolderListModel
-from .schemas import RequestImport
-from cloud.utils import QueueWorker
-from ..db.schema import ItemType
+from cloud.model import FileListModel, FolderListModel
+from cloud.model.exceptions import ModelValidationError
+from cloud.model.schemas import RequestImport, ItemType
+from .base import BaseImportService
 
 
-# todo: refactor connection
-# todo: clean WHERE 1!=1
 class ImportService(BaseImportService):
     __slots__ = ('data', '_files_mdl', '_folders_mdl', '_folder_ids_set')
 
@@ -37,7 +32,6 @@ class ImportService(BaseImportService):
     @property
     def folder_ids_set(self) -> set[str]:
         """All folder ids from import items id and parent_id fields diff None parent_id"""
-        # functools.cached_property doesn't work with __slots__
         if self._folder_ids_set is None:
             self._folder_ids_set = reduce(
                 set.union,
@@ -51,7 +45,7 @@ class ImportService(BaseImportService):
 
         return self._folder_ids_set
 
-    def create_models(self, conn: SAConnection):
+    def _create_items_models(self, conn: SAConnection):
         files = {}
         folders = {}
 
@@ -63,30 +57,44 @@ class ImportService(BaseImportService):
 
         self._files_mdl = FileListModel(conn, files)
         self._folders_mdl = FolderListModel(conn, folders)
-        self._import_mdl = ImportModel(conn, self._files_mdl.ids, self.folder_ids_set)
 
-    async def init_models(self):
-        await super().init_models()
+    async def acquire_locks(self, conn: SAConnection):
+        await self.import_mdl.lock_ids(self.folder_ids_set | self.files_mdl.ids)
+        await self.import_mdl.lock_branches(self.folder_ids_set, self.files_mdl.ids)
+        self.import_mdl.release_queue()
 
-        await self.folders_mdl.init()
-        await self.files_mdl.init()
+    async def init_models(self, conn: SAConnection):
+        if self.data.items:
+            self._create_items_models(conn)
+            await self.acquire_locks(conn)
 
-        if await self.files_mdl.any_id_exists(self.folders_mdl.ids):
-            raise ModelValidationError('Some folder ids already exists in files ids')
-        if await self.folders_mdl.any_id_exists(self.files_mdl.ids):
-            raise ModelValidationError('Some file ids already exists in folders ids')
+            await self.folders_mdl.init()
+            await self.files_mdl.init()
+
+            if self.folders_mdl.ids:
+                exist_in_files = await self.files_mdl.any_id_exists(self.folders_mdl.ids)
+                if exist_in_files:
+                    raise ModelValidationError('Some folder ids already exists in files ids')
+
+            if self.files_mdl.ids:
+                exist_in_folder = await self.folders_mdl.any_id_exists(self.files_mdl.ids)
+                if exist_in_folder:
+                    raise ModelValidationError('Some file ids already exists in folders ids')
 
     async def _post_import(self):
         if self.data.items:
             import_id = self.import_mdl.import_id
 
             # write history
-            await self.import_mdl.write_folders_history()
+            await self.import_mdl.write_folders_history(
+                self.folder_ids_set,
+                self.files_mdl.ids
+            )
             await self.files_mdl.write_history()
 
             await self.import_mdl.subtract_parent_sizes(
-                self.files_mdl.existent_ids,
-                self.folders_mdl.existent_ids
+                self.folders_mdl.existent_ids,
+                self.files_mdl.existent_ids
             )
             # insert new nodes
             await self.folders_mdl.insert_new(import_id),
@@ -95,7 +103,10 @@ class ImportService(BaseImportService):
             await self.folders_mdl.update_existent(import_id),
             await self.files_mdl.update_existent(import_id),
 
-            await self.import_mdl.add_parent_sizes()
+            await self.import_mdl.add_parent_sizes(
+                self.files_mdl.ids,
+                self.folders_mdl.ids
+            )
 
     async def execute_post_import(self):
         await self._execute_in_import_transaction(self._post_import())

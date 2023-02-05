@@ -1,23 +1,18 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from .base_service import BaseService
-from .schemas import ItemType, ListResponseItem
+from asyncpg import Record
+
+from .base import BaseModel
 from cloud.queries import FileQuery
 
 
-class HistoryService(BaseService):
-    __slots__ = ('date_end',)
+class HistoryModel(BaseModel):
+    async def get_files_updates_daterange(
+            self,
+            date_start: datetime,
+            date_end: datetime
+    ) -> list[Record]:
 
-    def __init__(self, date: datetime):
-        super().__init__()
-        self.date_end = date
+        query = FileQuery.select_updates_daterange(date_start, date_end)
+        return await self.conn.fetch(query)
 
-    async def get_files_updates(self, days: int = 1) -> ListResponseItem:
-        date_start = self.date_end - timedelta(days=days)
-
-        query = FileQuery.select_updates_daterange(date_start, self.date_end)
-
-        res = await self.pg.fetch(query)
-
-        items = ListResponseItem(items=[{'type': ItemType.FILE, **rec} for rec in res])
-        return items

@@ -11,12 +11,11 @@ from cloud.queries import import_queries
 logger = logging.getLogger(__name__)
 
 
-# todo: cancel task on shutdown
 class QueueWorker:
     """this class is just my adhoc experiment to handle simultaneous imports requests."""
 
-    # todo: test task set
-    _tasks_set: set[asyncio.Task] = set()
+    __slots__ = ('_date', '_queue_id')
+
     _wait_queue_events: dict[int, asyncio.Event] = {}
     _release_queue_events: dict[int, asyncio.Event] = {}
 
@@ -49,27 +48,13 @@ class QueueWorker:
         cls._worker_task = asyncio.create_task(cls.run(sleep_time))
         logger.info('Queue worker started')
 
-    # def shutdown(self):
-    #     self.worker_task.cancel()
-
     @classmethod
     async def run(cls, sleep_time: float):
-        counter = 0
-        request_counter = 0
-        period = int(10 / sleep_time) if sleep_time > 0 else 100000
 
         while True:
-            counter += 1
-            if counter % period == 0:
-                logger.info('Queue worker listening')
-
             if cls._wait_queue_events:
-                request_counter += 1
-
                 queue_id = await cls._get_oldest_id()
                 if queue_id is not None:
-                    logger.info('Queue worker sent %d requests to db looking for %d', request_counter, queue_id)
-                    request_counter = 0
                     await cls._leave_queue(queue_id)
 
             await asyncio.sleep(sleep_time)
@@ -95,8 +80,6 @@ class QueueWorker:
         event = asyncio.Event()
         events_dict[i] = event
         waiter_task = asyncio.create_task(event.wait())
-        waiter_task.add_done_callback(cls._tasks_set.discard)
-        cls._tasks_set.add(waiter_task)
 
         await waiter_task
 

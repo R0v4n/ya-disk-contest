@@ -4,12 +4,12 @@ from asyncpg import Record
 from asyncpgsa.connection import SAConnection
 
 from cloud.db.schema import ItemType
-from cloud.model.base_model import BaseModel
-from cloud.model.exceptions import ItemNotFoundError, ModelValidationError
-from cloud.queries import QueryT, FileQuery, FolderQuery, import_queries
+from cloud.queries import QueryT, FileQuery, FolderQuery
+from .base import BaseInitModel
+from .exceptions import ItemNotFoundError, ModelValidationError
 
 
-class NodeModel(BaseModel):
+class NodeModel(BaseInitModel):
 
     def __init__(self, conn: SAConnection, node_id: str):
         super().__init__(conn)
@@ -29,7 +29,6 @@ class NodeModel(BaseModel):
     async def init(self):
         for self._query, self._node_type in zip([FileQuery, FolderQuery], ItemType):
             node_exists = await self.conn.fetchval(self._query.exist(self.node_id))
-
             if node_exists:
                 return
 
@@ -48,20 +47,10 @@ class NodeModel(BaseModel):
 
         return await self.conn.fetch(query)
 
-    async def delete_node(self, import_id):
+    async def delete_node(self):
+        await self.conn.execute(self.query.delete(self.node_id))
+
+    async def write_parents_to_history(self):
         parents = self.query.recursive_parents(self.node_id).select()
         history_q = FolderQuery.insert_history_from_select(parents)
-
-        if self.node_type == ItemType.FILE:
-            file_id, folder_id = self.node_id, None
-        else:
-            file_id, folder_id = None, self.node_id
-
-        update_q = import_queries.update_parent_sizes(
-            file_id, folder_id, import_id,
-            import_queries.Sign.SUB
-        )
-
         await self.conn.execute(history_q)
-        await self.conn.execute(update_q)
-        await self.conn.execute(self.query.delete(self.node_id))

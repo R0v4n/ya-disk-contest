@@ -1,105 +1,112 @@
 import asyncio
-import sys
 from contextlib import nullcontext
-from datetime import datetime, timezone, timedelta
 from http import HTTPStatus
 
 import pytest
-from asyncpg import UniqueViolationError, DeadlockDetectedError
-from asyncpgsa import PG
-from fastapi import Depends
+from asyncpg import UniqueViolationError
+from asyncpgsa.connection import SAConnection
+from fastapi import APIRouter
 from httpx import AsyncClient
-from rich import print
 from starlette.responses import Response
 
 from cloud import model
+from cloud import services
 from cloud.api_fastapi.app import create_app
-from cloud.api_fastapi.routers import get_pg
-from cloud.model import ItemType
+from cloud.api_fastapi.routers import service_depends
 from cloud.resources import url_paths
 from cloud.utils.testing import (
-    post_import, get_node_history, del_node,
-    compare_db_fc_state, Folder, File, get_node_records, FakeCloudGen
+    post_import, del_node,
+    compare_db_fc_state, Folder, FakeCloudGen
 )
-
-sys.setrecursionlimit(5000)
 
 delay_imports_url = '/delay' + url_paths.IMPORTS
 no_locks_imports_url = '/no-locks' + url_paths.IMPORTS
-no_advisory_imports_url = '/no-advisory' + url_paths.IMPORTS
+no_queue_imports_url = '/no-queue' + url_paths.IMPORTS
 
+delay_delete_node_url = '/delay' + url_paths.DELETE_NODE
 no_locks_delete_node_url = '/no-locks' + url_paths.DELETE_NODE
 
-# todo: replace expectation with HTTPStatus somewhere
-# todo: create outer router
+
+class DelayNodeImportService(services.NodeImportService):
+    async def _delete_node(self):
+        await asyncio.sleep(0.5)
+        await super()._delete_node()
 
 
-class NoLocksNodeImportModel(model.NodeImportService):
-    async def acquire_locks(self):
-        """do nothing"""
+class NoLocksNodeImportService(services.NodeImportService):
+
+    async def init_models(self, conn: SAConnection):
+        self._mdl = model.NodeModel(conn, self.node_id)
+        await self.mdl.init()
+        self.import_mdl.release_queue()
 
 
-class NoAdvisoryLockImportModel(model.ImportService):
-    """
-    Without these locks the first transaction may not have time to lock all records.
-    See test_lock.
-    """
+class NoQueueImportService(services.ImportService):
+    import_id = 10000
 
-    async def acquire_advisory_lock(self, i: int):
-        """do nothing"""
+    async def acquire_locks(self, conn: SAConnection):
+        await self.import_mdl.lock_ids(self.folder_ids_set | self.files_mdl.ids)
+        await self.import_mdl.lock_branches(self.folder_ids_set, self.files_mdl.ids)
+        # self.import_mdl.release_queue()
 
-    async def release_advisory_lock(self, i: int):
-        """do nothing"""
+    async def execute_post_import(self):
+        async with self.pg.transaction() as conn:
+            self._import_mdl = model.ImportModel(conn, self.import_id)
+            self.__class__.import_id += 1
 
-
-class DelayImportModel(model.ImportService):
-
-    async def write_folders_history(self):
-        await super().write_folders_history()
-        print('waiting')
-        await asyncio.sleep(1)
+            await self.init_models(conn)
+            await self.import_mdl.insert_import(self.date)
+            await self._post_import()
 
 
-class NoLocksImportModel(DelayImportModel):
-    async def acquire_ids_locks(self):
-        """do nothing"""
+class DelayImportService(services.ImportService):
+
+    async def _post_import(self):
+        await asyncio.sleep(0.5)
+        await super()._post_import()
 
 
-async def patched_imports(mdl: DelayImportModel = Depends(), pg: PG = Depends(get_pg)):
-    await mdl.init(pg)
-    await mdl.execute_post_import()
+class NoLocksImportService(DelayImportService):
 
-    return Response()
-
-
-async def no_locks_imports(mdl: NoLocksImportModel = Depends(), pg: PG = Depends(get_pg)):
-    await mdl.init(pg)
-    await mdl.execute_post_import()
-
-    return Response()
+    async def acquire_locks(self, conn: SAConnection):
+        self.import_mdl.release_queue()
 
 
-async def no_locks_delete_node(mdl: NoLocksNodeImportModel = Depends(), pg: PG = Depends(get_pg)):
-    await mdl.init(pg)
-    await mdl.execute_delete_node()
+def create_test_router():
+    router = APIRouter()
 
-    return Response()
+    @router.post(delay_imports_url)
+    async def delay_imports(service: DelayImportService = service_depends(DelayImportService)):
+        await service.execute_post_import()
+        return Response()
 
+    @router.post(no_locks_imports_url)
+    async def no_locks_imports(service: NoLocksImportService = service_depends(NoLocksImportService)):
+        await service.execute_post_import()
+        return Response()
 
-async def no_advisory_imports(mdl: NoAdvisoryLockImportModel = Depends(), pg: PG = Depends(get_pg)):
-    await mdl.init(pg)
-    await mdl.execute_post_import()
+    @router.post(no_queue_imports_url)
+    async def no_queue_imports(service: NoQueueImportService = service_depends(NoQueueImportService)):
+        await service.execute_post_import()
+        return Response()
 
-    return Response()
+    @router.delete(delay_delete_node_url)
+    async def delay_delete_node(service: DelayNodeImportService = service_depends(DelayNodeImportService)):
+        await service.execute_delete_node()
+        return Response()
+
+    @router.delete(no_locks_delete_node_url)
+    async def no_locks_delete_node(service: NoLocksNodeImportService = service_depends(NoLocksNodeImportService)):
+        await service.execute_delete_node()
+        return Response()
+
+    return router
 
 
 @pytest.fixture
 async def api_client(arguments):
     app = create_app(arguments)
-    app.router.post(delay_imports_url, response_class=Response)(patched_imports)
-    app.router.post(no_locks_imports_url, response_class=Response)(no_locks_imports)
-    app.router.post(no_advisory_imports_url, response_class=Response)(no_advisory_imports)
-    app.router.delete(no_locks_delete_node_url, response_class=Response)(no_locks_delete_node)
+    app.include_router(create_test_router())
 
     async with AsyncClient(
             app=app,
@@ -113,12 +120,12 @@ async def api_client(arguments):
 
 
 @pytest.mark.parametrize(
-    'url, expectation',
+    'url, expected_status',
     [
-        (delay_imports_url, nullcontext()),
-        (no_locks_imports_url, pytest.raises(AssertionError))
+        (delay_imports_url, HTTPStatus.OK),
+        (no_locks_imports_url, HTTPStatus.BAD_REQUEST)
     ])
-async def test_parent_exist(api_client, fake_cloud, sync_connection, url, expectation):
+async def test_parent_exist(api_client, fake_cloud, sync_connection, url, expected_status):
     """
     without lock next import will not see parent folder from previous import.
     """
@@ -131,11 +138,13 @@ async def test_parent_exist(api_client, fake_cloud, sync_connection, url, expect
         fake_cloud.insert_item(folder)
 
     imports = [fake_cloud.get_import_dict(i) for i in range(-n, 0)]
+    data_iter = iter(imports)
 
-    corus = [post_import(api_client, data, path=url) for data in imports]
-    with expectation:
-        # this check runs only if no exceptions raised above
-        await asyncio.gather(*corus)
+    coro1 = post_import(api_client, next(data_iter), path=url)
+    coros = [post_import(api_client, data, path=url, expected_status=expected_status) for data in data_iter]
+
+    await asyncio.gather(coro1, *coros)
+    if expected_status == HTTPStatus.OK:
         compare_db_fc_state(sync_connection, fake_cloud)
 
 
@@ -176,133 +185,48 @@ async def test_file_update(api_client, fake_cloud, sync_connection, url, expecta
     """
     fake_cloud.generate_import(1)
     file = fake_cloud[0]
+    c1 = post_import(api_client, fake_cloud.get_import_dict(), path=url)
 
     fake_cloud.generate_import()
     fake_cloud.update_item(file.id, size=10)
+    c2 = post_import(api_client, fake_cloud.get_import_dict(), path=url)
 
-    imports = [fake_cloud.get_import_dict(i) for i in range(-2, 0)]
-
-    corus = [post_import(api_client, data, path=url) for data in imports]
     with expectation:
-        await asyncio.gather(*corus)
+        await asyncio.gather(c1, c2)
         compare_db_fc_state(sync_connection, fake_cloud)
 
 
-@pytest.fixture
-def bunch_count():
-    return 6
-
-
-@pytest.fixture
-async def db_with_nested_folders(api_client, bunch_count):
-    # note:
-    #  There were some problems with recursion depth during my experiments.
-    #  So in this test import data creating without fake_cloud (i don't want to fix recursion problems in fake cloud).
-
-    date = datetime.now(timezone.utc)
-
-    async def post_nested_folders(n: int, parent_id: str | None, dt: datetime):
-        data = {'items': [], 'updateDate': dt.isoformat()}
-        for _ in range(n):
-            folder = Folder(parent_id=parent_id)
-            parent_id = folder.id
-            data['items'].append(folder.import_dict)
-
-        await post_import(api_client, data)
-        return data['items'][0], data['items'][-1]
-
-    top_folder_dict, bottom_folder_dict = await post_nested_folders(200, None, date)
-
-    last_parent_id = bottom_folder_dict['id']
-    for _ in range(bunch_count - 1):
-        date += timedelta(seconds=1)
-        __, bottom_folder_dict = await post_nested_folders(200, last_parent_id, date)
-        last_parent_id = bottom_folder_dict['id']
-
-    return top_folder_dict, bottom_folder_dict, date
-
-
 @pytest.mark.parametrize(
     'url, expectation',
     [
-        (url_paths.IMPORTS, nullcontext()),
-        (no_advisory_imports_url, pytest.raises(AssertionError))
+        (delay_imports_url, nullcontext()),
+        (no_queue_imports_url, pytest.raises(AssertionError))
     ])
-async def test_advisory_lock(api_client, sync_connection, db_with_nested_folders, bunch_count,
-                             url, expectation):
+async def test_updates_order(api_client, fake_cloud, sync_connection, url, expectation):
     """
     First import a bunch of nested folders.
     Then two concurrent imports:
-        - first import file in bottom folder
-        - second import file in top folder
+        - import file in bottom folder
+        - then import file in top folder
 
-    Without ImportModel.acquire_advisory_lock second concurrent transaction may
-    lock top folder ID earlier than the first transaction.
-    """
-
-    top_folder_dict, bottom_folder_dict, date = db_with_nested_folders
-
-    # ############# concurrent imports: first - file in bottom folder, second - file in top folder ############# #
-    files_count = 1
-    file_size = 10
-    imports = [
-        {
-            'items': [File(parent_id=folder_dict['id'], size=file_size).import_dict
-                      for _ in range(files_count)],
-            'updateDate': (date + timedelta(seconds=i)).isoformat()
-        } for i, folder_dict in enumerate([bottom_folder_dict, top_folder_dict], start=1)
-    ]
-
-    corus = [post_import(api_client, data, path=url) for data in imports]
-    await asyncio.gather(*corus)
-
-    # ############# get top folder size ############# #
-    res = get_node_records(sync_connection, ItemType.FOLDER, ids=[top_folder_dict['id']])
-    final_top_folder_size = res[0]['size']
-
-    # ############# get top folder history ############# #
-    date_end = datetime.fromisoformat(imports[-1]['updateDate'])
-    res = await get_node_history(api_client, top_folder_dict['id'], date_end - timedelta(hours=1), date_end)
-    items = res['items']
-    items.sort(key=lambda x: datetime.fromisoformat(x['date']))
-
-    expected_sizes = [0] * bunch_count + [file_size * files_count]
-
-    with expectation:
-        assert final_top_folder_size == 2 * file_size * files_count
-        assert [item['size'] for item in items] == expected_sizes
-
-
-# note: this test may fail sometimes with no_advisory_imports_url
-#  (i.e. handler works correctly actually). I don't want to simulate transaction delay for this case.
-@pytest.mark.parametrize(
-    'url, expectation',
-    [
-        (url_paths.IMPORTS, nullcontext()),
-        (no_advisory_imports_url, pytest.raises(AssertionError))
-    ])
-async def test_advisory_lock_with_fake_cloud(api_client, fake_cloud, sync_connection, url, expectation):
-    """
-    First import a bunch of nested folders.
-    Then two concurrent imports:
-        - first import file in bottom folder
-        - second import file in top folder
-
-    Without ImportModel.acquire_advisory_lock second concurrent transaction may
-    lock top folder ID earlier than the first transaction.
+    Without QueueWorker second concurrent transaction may
+    lock top folder ID before first transaction.
+    Simulation with sleep (see NoQueueImportService) doesn't look good.
+    But this problem is not consistent without it. It becomes obvious in load testing.
+    Or it can be recreated (without sleep) using this test with a huge number of nested folders.
     """
 
     fake_cloud.generate_import([])
     parent_id = fake_cloud[0].id
     top_folder = fake_cloud[0]
 
-    n = 350
+    n = 5
     for _ in range(n):
         folder = Folder(parent_id=parent_id)
         parent_id = folder.id
         fake_cloud.insert_item(folder)
 
-    await post_import(api_client, fake_cloud.get_import_dict(), path=url)
+    await post_import(api_client, fake_cloud.get_import_dict(), path=delay_imports_url)
 
     fake_cloud.generate_import(1, parent_id=parent_id)
     fake_cloud.generate_import(1, parent_id=top_folder.id)
@@ -310,8 +234,58 @@ async def test_advisory_lock_with_fake_cloud(api_client, fake_cloud, sync_connec
     imports = [fake_cloud.get_import_dict(i) for i in range(-2, 0)]
 
     corus = [post_import(api_client, data, path=url) for data in imports]
+    await asyncio.gather(*corus)
+
+    with expectation:
+        compare_db_fc_state(sync_connection, fake_cloud)
+
+
+# noinspection PyTypeChecker
+@pytest.mark.parametrize(
+    'url, expectation',
+    [
+        (url_paths.IMPORTS, nullcontext()),
+        (no_locks_imports_url, pytest.raises((AssertionError, UniqueViolationError)))
+    ])
+async def test_many_imports(api_client, sync_connection, url, expectation):
+    fake_cloud = FakeCloudGen()
+    n = 10
+    for _ in range(n):
+        fake_cloud.random_import(schemas_count=3, allow_random_count=False)
+        fake_cloud.random_updates(allow_random_count=False)
+
+    imports = [fake_cloud.get_import_dict(i) for i in range(-n, 0)]
+
+    corus = [post_import(api_client, data, path=url) for data in imports]
+
     with expectation:
         await asyncio.gather(*corus)
+        compare_db_fc_state(sync_connection, fake_cloud)
+
+
+@pytest.mark.parametrize(
+    'url, expected_status',
+    [
+        (url_paths.DELETE_NODE, HTTPStatus.OK),
+        (no_locks_delete_node_url, HTTPStatus.BAD_REQUEST)
+    ]
+)
+async def test_insert_and_del(api_client, sync_connection, fake_cloud, url, expected_status):
+    fake_cloud.generate_import([[[]]])
+    top_folder = fake_cloud[0]
+    bot_folder = fake_cloud[0, 0, 0]
+
+    await post_import(api_client, fake_cloud.get_import_dict())
+
+    fake_cloud.generate_import(1, parent_id=bot_folder.id)
+    coro1 = post_import(api_client, fake_cloud.get_import_dict(),
+                        path=delay_imports_url, expected_status=expected_status)
+
+    date = fake_cloud.del_item(top_folder.id)
+    coro2 = del_node(api_client, top_folder.id, date, path=url)
+
+    await asyncio.gather(coro1, coro2)
+    if expected_status == HTTPStatus.OK:
         compare_db_fc_state(sync_connection, fake_cloud)
 
 
@@ -319,77 +293,22 @@ async def test_advisory_lock_with_fake_cloud(api_client, fake_cloud, sync_connec
     'url, expectation',
     [
         (url_paths.DELETE_NODE, nullcontext()),
-        (no_locks_delete_node_url, pytest.raises(DeadlockDetectedError))
-    ])
-async def test_delete(api_client, db_with_nested_folders, sync_connection, url, expectation):
-    """
-    First import a bunch of nested folders.
-    Then two concurrent deletes:
-        - first bottom folder
-        - second top folder
+        (no_locks_delete_node_url, pytest.raises(AssertionError))
+    ]
+)
+async def test_deletes_in_one_branch(api_client, sync_connection, fake_cloud, url, expectation):
+    fake_cloud.generate_import([[[1], 1]])
+    mid_folder = fake_cloud[0, 0]
+    bot_folder = fake_cloud[0, 0, 0]
+    await post_import(api_client, fake_cloud.get_import_dict())
 
-    Without NodeImportModel.acquire_locks deadlock will be detected.
-    """
-    top_folder_dict, bottom_folder_dict, date = db_with_nested_folders
+    date = fake_cloud.del_item(bot_folder.id)
+    coro1 = del_node(api_client, bot_folder.id, date, path=delay_delete_node_url)
 
-    coroutine1 = del_node(api_client, bottom_folder_dict['id'], date + timedelta(seconds=1), path=url)
-    coroutine2 = del_node(api_client, top_folder_dict['id'], date + timedelta(seconds=2), path=url)
+    date = fake_cloud.del_item(mid_folder.id)
+    coro2 = del_node(api_client, mid_folder.id, date, path=url)
 
+    await asyncio.gather(coro1, coro2)
     with expectation:
-        await asyncio.gather(coroutine1, coroutine2)
-        assert get_node_records(sync_connection, ItemType.FOLDER) == []
-
-
-@pytest.mark.parametrize(
-    'url, status',
-    [
-        (url_paths.DELETE_NODE, HTTPStatus.OK),
-        (no_locks_delete_node_url, HTTPStatus.NOT_FOUND)
-    ])
-async def test_insert_and_del(api_client, fake_cloud, sync_connection, url, status):
-    """
-    without lock delete node handler will not see item from previous import.
-    """
-    fake_cloud.generate_import(1)
-    file = fake_cloud[0]
-
-    c1 = post_import(api_client, fake_cloud.get_import_dict(), path=delay_imports_url)
-    date = fake_cloud.del_item(file.id, fake_cloud.last_import_date + timedelta(seconds=1))
-
-    c2 = del_node(api_client, file.id, date, expected_status=status, path=url)
-
-    await asyncio.gather(c1, c2)
-    if status == HTTPStatus.OK:
+        # wrong top folder history
         compare_db_fc_state(sync_connection, fake_cloud)
-
-
-async def test_insert(api_client, fake_cloud, sync_connection):
-    """
-    without lock delete node handler will not see item from previous import.
-    """
-    fake_cloud.generate_import(1)
-    file = fake_cloud[0]
-    c1 = post_import(api_client, fake_cloud.get_import_dict())
-
-    fake_cloud.generate_import()
-    fake_cloud.update_item(file.id, size=10)
-    c2 = post_import(api_client, fake_cloud.get_import_dict())
-
-    await asyncio.gather(c1, c2)
-    compare_db_fc_state(sync_connection, fake_cloud)
-
-
-async def test_many(api_client, sync_connection):
-    fake_cloud = FakeCloudGen()
-    n = 20
-    for _ in range(n):
-        fake_cloud.random_import(schemas_count=3, allow_random_count=False)
-        fake_cloud.random_updates(allow_random_count=False)
-
-    imports = [fake_cloud.get_import_dict(i) for i in range(-n, 0)]
-
-    corus = [post_import(api_client, data) for data in imports]
-
-    await asyncio.gather(*corus)
-    compare_db_fc_state(sync_connection, fake_cloud)
-    print(fake_cloud.get_tree())

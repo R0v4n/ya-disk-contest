@@ -5,13 +5,10 @@ from random import choice, uniform, randint
 
 from locust import task, FastHttpUser, constant, events
 from locust.runners import MasterRunner
-from rich import print
 
 from cloud.resources import url_paths
 from cloud.utils.testing import FakeCloudGen, url_for, Folder
 
-
-# todo: check asyncpgsa logs and fix queries
 
 @events.test_start.add_listener
 def on_test_start(environment, **_kwargs):
@@ -75,7 +72,7 @@ class User(FastHttpUser):
             )
             return resp
 
-    @task(6)
+    @task(9)
     def post_import(self):
         coin = randint(0, 2)
         if coin:
@@ -88,7 +85,6 @@ class User(FastHttpUser):
 
         self.last_import_ids = {i['id'] for i in data['items']}
 
-        print(f'POST: date={data["updateDate"]}')
         self.request('POST', url_paths.IMPORTS, json=data)
 
     def delete_node(self, ids, **req_kwargs):
@@ -99,7 +95,6 @@ class User(FastHttpUser):
             node_id = choice(ids)
             date = self.cloud.del_item(node_id)
             path = url_for(url_paths.DELETE_NODE, {'node_id': node_id}, {'date': date})
-            print(f'DELETE: date={date}')
 
             self.request('DELETE', path, **req_kwargs)
 
@@ -107,7 +102,7 @@ class User(FastHttpUser):
     def delete_folder(self):
         self.delete_node(set(self.cloud.folder_ids) - self.root_ids, name='delete folder')
 
-    @task(5)
+    @task(2)
     def delete_file(self):
         self.delete_node(self.cloud.file_ids, name='delete file')
 
@@ -116,7 +111,6 @@ class User(FastHttpUser):
         if ids:
             node_id = choice(ids)
             path = url_for(url_paths.GET_NODE, {'node_id': node_id})
-            print(f'{req_kwargs["name"].upper()}: id={node_id} ')
 
             self.request('GET', path, **req_kwargs)
 
@@ -138,7 +132,6 @@ class User(FastHttpUser):
 
             ds = self.first_import_date + delta * uniform(-1, 1)
             de = ds + delta * uniform(0.1, 1.5)
-            print('NODE HISTORY:', ds, de)
             path = url_for(
                 url_paths.GET_NODE_HISTORY,
                 path_params=dict(node_id=node_id),
@@ -157,8 +150,6 @@ class User(FastHttpUser):
     @task(24)
     def get_updates(self):
         date = self.cloud.last_import_date + timedelta(hours=23, minutes=59, seconds=58)
-
-        print('GET UPDATES:', date)
 
         path = url_for(
             url_paths.GET_UPDATES,
