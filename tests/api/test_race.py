@@ -3,6 +3,8 @@ from contextlib import nullcontext
 from http import HTTPStatus
 
 import pytest
+from aiohttp.test_utils import TestServer, TestClient
+from aiohttp.web_urldispatcher import UrlDispatcher
 from asyncpg import UniqueViolationError
 from asyncpgsa.connection import SAConnection
 from fastapi import APIRouter
@@ -11,8 +13,10 @@ from starlette.responses import Response
 
 from cloud import model
 from cloud import services
-from cloud.api_fastapi.app import create_app
+from cloud.api_fastapi.app import create_app as create_fastapi_app
 from cloud.api_fastapi.routers import service_depends
+from cloud.api_aiohttp.app import create_app as create_aiohttp_app
+from cloud.api_aiohttp.handlers import ImportsView, DeleteNodeView
 from cloud.resources import url_paths
 from cloud.utils.testing import (
     post_import, del_node,
@@ -72,7 +76,34 @@ class NoLocksImportService(DelayImportService):
         self.import_mdl.release_queue()
 
 
-def create_test_router():
+def add_aiohttp_handlers(router: UrlDispatcher):
+    class DelayImportsView(ImportsView):
+        ServiceT = DelayImportService
+
+    router.add_post(delay_imports_url, DelayImportsView)
+
+    class NoLocksImportsView(ImportsView):
+        ServiceT = NoLocksImportService
+
+    router.add_post(no_locks_imports_url, NoLocksImportsView)
+
+    class NoQueueImportsView(ImportsView):
+        ServiceT = NoQueueImportService
+
+    router.add_post(no_queue_imports_url, NoQueueImportsView)
+
+    class DelayDeleteNodeView(DeleteNodeView):
+        ServiceT = DelayNodeImportService
+
+    router.add_delete(delay_delete_node_url, DelayDeleteNodeView)
+
+    class NoLocksDeleteNodeView(DeleteNodeView):
+        ServiceT = NoLocksNodeImportService
+
+    router.add_delete(no_locks_delete_node_url, NoLocksDeleteNodeView)
+
+
+def create_fastapi_router():
     router = APIRouter()
 
     @router.post(delay_imports_url)
@@ -104,19 +135,36 @@ def create_test_router():
 
 
 @pytest.fixture
-async def api_client(arguments):
-    app = create_app(arguments)
-    app.include_router(create_test_router())
+async def api_client(arguments, is_aiohttp):
+    if is_aiohttp:
+        app = create_aiohttp_app(arguments)
+        add_aiohttp_handlers(app.router)
 
-    async with AsyncClient(
-            app=app,
-            base_url="http://test"
-    ) as client:
+        server = TestServer(
+            app,
+            host=str(arguments.api_address),
+            port=arguments.api_port
+        )
+        client = TestClient(server)
+
         try:
-            await app.router.startup()
+            await client.start_server()
             yield client
         finally:
-            await app.router.shutdown()
+            await client.close()
+    else:
+        app = create_fastapi_app(arguments)
+        app.include_router(create_fastapi_router())
+
+        async with AsyncClient(
+                app=app,
+                base_url="http://test"
+        ) as client:
+            try:
+                await app.router.startup()
+                yield client
+            finally:
+                await app.router.shutdown()
 
 
 @pytest.mark.parametrize(
