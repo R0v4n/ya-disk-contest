@@ -36,7 +36,6 @@ class ImportModel(BaseModel):
     def release_queue(self):
         QueueWorker.release_queue(self.import_id)
 
-    # todo: think about refactor ids types and acquire_ids_locks
     async def lock_ids(self, ids: Iterable[str]):
         query = 'VALUES '
         query += ', '.join(
@@ -45,7 +44,7 @@ class ImportModel(BaseModel):
         )
         await self.conn.execute(query)
 
-    async def lock_branches(self, folder_ids, file_ids):
+    async def lock_branches(self, folder_ids: Ids, file_ids: Ids):
         """locks old and new parent branches for given ids"""
 
         cte = import_queries.folders_with_recursive_parents_cte(
@@ -60,16 +59,12 @@ class ImportModel(BaseModel):
     def acquire_locks_ctx(self, ids: Iterable[str]):
         return AcquireLocksContext(self, ids)
 
-    # todo: move description
     async def write_folders_history(self, folder_ids, file_ids):
         """
-        Write in folder_history table folder records that will be updated during import:
-            1) new nodes existent parents
-            2) old parents for updated nodes
-            3) updated nodes new parents, that exist in the db
-            4) updated folders (import items with type folder, that already exist in the db)
-            5) all recursive parents of folders mentioned above
-
+        Write in folder_history table folder records:
+            1) with id in folder_ids
+            2) all recursive parents of folders with id in folder_ids
+            3) all recursive parents of files with id in file_ids
         All records selecting in one recursive query.
         """
         cte = import_queries.folders_with_recursive_parents_cte(
@@ -78,7 +73,7 @@ class ImportModel(BaseModel):
         insert_hist = FolderQuery.insert_history_from_select(cte.select())
         await self.conn.execute(insert_hist)
 
-    async def subtract_parent_sizes(self, folders_existent_ids, files_existent_ids):
+    async def subtract_parent_sizes(self, folders_existent_ids: Ids, files_existent_ids: Ids):
         if folders_existent_ids or files_existent_ids:
             query = import_queries.update_parent_sizes(
                 files_existent_ids,
@@ -88,7 +83,7 @@ class ImportModel(BaseModel):
             )
             await self.conn.execute(query)
 
-    async def add_parent_sizes(self, file_ids, folder_ids):
+    async def add_parent_sizes(self, file_ids: Ids, folder_ids: Ids):
         query = import_queries.update_parent_sizes(
             file_ids,
             folder_ids,
@@ -100,7 +95,7 @@ class ImportModel(BaseModel):
 class AcquireLocksContext:
     __slots__ = ('mdl', 'i', '_ids', '_branches_ids')
 
-    def __init__(self, mdl: ImportModel, ids: Iterable[str], i: int = 0):
+    def __init__(self, mdl: ImportModel, ids: Ids, i: int = 0):
         self.mdl = mdl
         self.i = i
         self._ids = ids

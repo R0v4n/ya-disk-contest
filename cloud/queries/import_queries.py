@@ -1,12 +1,13 @@
 from datetime import datetime
 from enum import IntEnum
-from typing import Iterable, Any
+from typing import Any
 
 from sqlalchemy import select, func
 
 from cloud.db.schema import imports_table, queue_table, files_table, folders_table
-from .tools import ids_condition, build_columns
+from . import Ids
 from .item_table_queries import FileQuery, FolderQuery
+from .tools import ids_condition, build_columns
 
 
 def insert_import_auto_id(date: datetime):
@@ -42,8 +43,7 @@ class Sign(IntEnum):
     SUB = -1
 
 
-def recursive_parents_with_size(file_ids: Iterable[str] | str | None,
-                                folder_ids: Iterable[str] | str | None, sign: Sign = Sign.ADD):
+def recursive_parents_with_size(file_ids: Ids, folder_ids: Ids, sign: Sign = Sign.ADD):
     if file_ids:
         # in this case string cols are parents cols, so child sizes need to be explicit
         direct_parents = FileQuery.direct_parents(file_ids, ['id', 'parent_id', files_table.c.size])
@@ -97,12 +97,7 @@ def recursive_parents_with_size(file_ids: Iterable[str] | str | None,
     return all_parents
 
 
-# todo: remove sign?
-def update_parent_sizes(
-        file_ids: Iterable[str] | str | None,
-        folder_ids: Iterable[str] | str | None,
-        import_id: int,
-        sign: Sign = Sign.ADD):
+def update_parent_sizes(file_ids: Ids, folder_ids: Ids, import_id: int, sign: Sign = Sign.ADD):
 
     select_q = recursive_parents_with_size(file_ids, folder_ids, sign).alias()
 
@@ -112,11 +107,7 @@ def update_parent_sizes(
     return query
 
 
-def folders_with_recursive_parents_cte(
-        folder_ids: Iterable[str] | str | None,
-        child_file_ids: Iterable[str] | str | None,
-        columns: list[str | Any] = None
-):
+def folders_with_recursive_parents_cte(folder_ids: Ids, child_file_ids: Ids, columns: list[str | Any] = None):
     """
     Select folders records:
         - with ids belongs to folder_ids,

@@ -81,16 +81,30 @@ class ImportService(BaseImportService):
                 if exist_in_folder:
                     raise ModelValidationError('Some file ids already exists in folders ids')
 
+    async def write_history(self):
+        """
+        Write in folder_history table folder records that will be updated during import:
+            1) new nodes existent parents
+            2) old parents for updated nodes
+            3) updated nodes new parents, that exist in the db
+            4) updated folders (import items with type folder, that already exist in the db)
+            5) all recursive parents of folders mentioned above
+
+        All records selecting in one recursive query.
+
+        Write in file_history table all file records that will be updated during import.
+        """
+        await self.import_mdl.write_folders_history(
+            self.folder_ids_set,
+            self.files_mdl.ids
+        )
+        await self.files_mdl.write_history()
+
     async def _post_import(self):
         if self.data.items:
             import_id = self.import_mdl.import_id
 
-            # write history
-            await self.import_mdl.write_folders_history(
-                self.folder_ids_set,
-                self.files_mdl.ids
-            )
-            await self.files_mdl.write_history()
+            await self.write_history()
 
             await self.import_mdl.subtract_parent_sizes(
                 self.folders_mdl.existent_ids,
