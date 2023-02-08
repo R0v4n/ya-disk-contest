@@ -3,12 +3,12 @@ requires = ["setuptools>=65.5"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cloud"
+name = "ya-disk-contest"
 version = "0.1.0"
 authors = [
   { name="Andrey Khabirov", email="mr.rovan@yandex.ru" }
 ]
-description = " REST API service implementing backend for a file storage web service, similar to the Yandex Disk service"
+description = "REST API service implementing backend for a file storage web service, like the Yandex Disk service"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file='LICENSE'}
@@ -28,8 +28,8 @@ dynamic = ["dependencies", "optional-dependencies"]
 
 
 [project.scripts]
-cloud-api = "cloud.__main__:main"
-cloud-db = "cloud.db.__main__:main"
+disk-api = "cloud.__main__:main"
+disk-db = "cloud.db.__main__:main"
 
 
 [tool.setuptools.dynamic]

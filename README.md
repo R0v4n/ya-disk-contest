@@ -1,4 +1,4 @@
-# Ya-contest-cloud-api
+# Ya-disk-contest
 
 Сервис с REST API, реализующий бэкенд для веб-сервиса хранения файлов, аналогичный сервису Яндекс Диск.
 Позволяет пользователям загружать и обновлять информацию о файлах и папках.
@@ -9,17 +9,19 @@
 ---
 Приложение упаковано в Docker-контейнер. Внутри Docker-контейнера доступны две команды: `cloud-db` — утилита для управления состоянием базы данных и `cloud-api` — утилита для запуска REST API сервиса.
 
+Сервис реализован с помощью двух веб фреймворков: `aiohttp` и `fastapi`. Для запуска использовать соответственно команды `cloud-api aiohttp` и `cloud-api fastapi`.
+
 ## Как использовать?
 
 ---
 * Создать сеть:
   ```shell
-  $ docker network create api-net
+  docker network create api-net
   ```
   
   Запустить контейнер с Postgres в сети:
   ```shell
-  $ docker run --rm -d \
+  docker run --rm -d \
       --name=db \
       --network api-net \
       -e POSTGRES_USER=user \
@@ -31,22 +33,23 @@
   
   Применить миграции (хост - имя контейнера с Postgres):
   ```shell
-  $ docker run -it --network api-net \
+  docker run -it --network api-net \
       -e CLOUD_PG_DSN=postgresql://user:psw@db/cloud \
       r0van/enrollment_autumn_2022 cloud-db upgrade head
   ```
   
   Запустить REST API сервис локально на порту 8081:
   ```shell
-  $ docker run -it --network api-net -p 8081:8081 \
+  docker run -it --network api-net -p 8081:8081 \
       -e CLOUD_PG_DSN=postgresql://user:psw@db/cloud \
-      r0van/enrollment_autumn_2022
+      r0van/ya-disk-contest
   ```
 
 * Или использовать docker-compose [файл](docker-compose.yml):
 
   ```shell
-  $ docker-compose up
+  docker-compose up db -d
+  docker-compose up api -d
   ```
   И также применить миграции внутри контейнера с приложением. 
 

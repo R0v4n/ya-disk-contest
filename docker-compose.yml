@@ -16,7 +16,7 @@ services:
       - "5432:5432"
 
   api:
-    image: r0van/cloud
+    image: r0van/ya-disk-contest
     command: cloud-api fastapi
     ports:
       - "8081:8081"
