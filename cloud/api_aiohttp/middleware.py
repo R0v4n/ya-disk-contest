@@ -6,7 +6,7 @@ from aiohttp.web_middlewares import middleware
 from aiohttp.web_request import Request
 from pydantic import ValidationError
 
-from cloud.model.exceptions import ItemNotFoundError, ModelValidationError
+from cloud.db.repositories.exceptions import ItemNotFoundError, ModelValidationError
 
 logger = logging.getLogger(__name__)
 

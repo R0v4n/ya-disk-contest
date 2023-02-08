@@ -7,7 +7,7 @@ from aiohttp.payload import JsonPayload as BaseJsonPayload
 from aiohttp.typedefs import JSONEncoder
 from asyncpg import Record
 
-from cloud.model import ItemType
+from cloud.db.schema import ItemType
 
 
 @singledispatch

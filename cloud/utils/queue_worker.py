@@ -5,7 +5,7 @@ from datetime import datetime
 from asyncpg import UndefinedTableError
 from asyncpgsa import PG
 
-from cloud.queries import import_queries
+from cloud.db.queries import import_queries
 
 
 logger = logging.getLogger(__name__)

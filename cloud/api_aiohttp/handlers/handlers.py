@@ -4,7 +4,7 @@ from aiohttp.web_response import Response
 from aiohttp_pydantic.oas.typing import r200, r404, r400
 
 from cloud import services
-from cloud import model
+from cloud import models
 from cloud.resources import url_paths
 from .base import PydanticView
 
@@ -13,7 +13,7 @@ class ImportsView(PydanticView):
     URL_PATH = url_paths.IMPORTS
     ServiceT = services.ImportService
 
-    async def post(self, data: model.RequestImport) -> r200 | r400[model.Error]:
+    async def post(self, data: models.RequestImport) -> r200 | r400[models.Error]:
         """
         Импортирует элементы файловой системы. Элементы импортированные повторно обновляют текущие.
         Изменение типа элемента с папки на файл и с файла на папку не допускается.
@@ -29,7 +29,8 @@ class ImportsView(PydanticView):
           - поле size при импорте папки всегда должно быть равно null
           - поле size для файлов всегда должно быть больше 0
           - при обновлении элемента обновленными считаются **все** их параметры
-          - при обновлении параметров элемента обязательно обновляется поле **date** в соответствии с временем обновления
+          - при обновлении параметров элемента обязательно обновляется поле **date**
+            в соответствии с временем обновления
           - в одном запросе не может быть двух элементов с одинаковым id
           - дата обрабатывается согласно ISO 8601 (такой придерживается OpenAPI).
           Если дата не удовлетворяет данному формату, ответом будет код 400.
@@ -49,7 +50,7 @@ class ImportsView(PydanticView):
 class NodeView(PydanticView):
     URL_PATH = url_paths.GET_NODE
 
-    async def get(self, node_id: str, /) -> r200[model.ResponseNodeTree] | r404[model.Error] | r400[model.Error]:
+    async def get(self, node_id: str, /) -> r200[models.ResponseNodeTree] | r404[models.Error] | r400[models.Error]:
         """
         Получить информацию об элементе по идентификатору.
         При получении информации о папке также предоставляется информация о её дочерних элементах.
@@ -72,7 +73,7 @@ class DeleteNodeView(PydanticView):
             self,
             node_id: str, /,
             date: datetime
-    ) -> r200 | r404[model.Error] | r400[model.Error]:
+    ) -> r200 | r404[models.Error] | r400[models.Error]:
         """
         Удалить элемент по идентификатору. При удалении папки удаляются все дочерние элементы.
         Доступ к истории обновлений удаленного элемента невозможен.
@@ -90,7 +91,7 @@ class DeleteNodeView(PydanticView):
 class UpdatesView(PydanticView):
     URL_PATH = url_paths.GET_UPDATES
 
-    async def get(self, date: datetime) -> r200[model.ListResponseItem] | r400[model.Error]:
+    async def get(self, date: datetime) -> r200[models.ListResponseItem] | r400[models.Error]:
         """
         Получение списка файлов, которые были обновлены за последние 24 часа включительно [date - 24h, date]
         от времени переданном в запросе.
@@ -113,7 +114,7 @@ class NodeHistoryView(PydanticView):
             node_id: str, /,
             dateStart: datetime,
             dateEnd: datetime
-    ) -> r200[model.ListResponseItem] | r400[model.Error] | r404[model.Error]:
+    ) -> r200[models.ListResponseItem] | r400[models.Error] | r404[models.Error]:
         """
         Получение истории обновлений по элементу за заданный полуинтервал [from, to).
         История по удаленным элементам недоступна.

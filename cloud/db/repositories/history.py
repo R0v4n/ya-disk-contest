@@ -2,11 +2,11 @@ from datetime import datetime
 
 from asyncpg import Record
 
-from .base import BaseModel
-from cloud.queries import FileQuery
+from .base import BaseRepository
+from cloud.db.queries import FileQuery
 
 
-class HistoryModel(BaseModel):
+class HistoryRepository(BaseRepository):
     async def get_files_updates_daterange(
             self,
             date_start: datetime,

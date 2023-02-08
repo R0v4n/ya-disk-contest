@@ -11,7 +11,7 @@ from fastapi import APIRouter
 from httpx import AsyncClient
 from starlette.responses import Response
 
-from cloud import model
+from cloud.db.repositories import NodeRepository, ImportRepository
 from cloud import services
 from cloud.api_fastapi.app import create_app as create_fastapi_app
 from cloud.api_fastapi.routers import service_depends
@@ -39,27 +39,27 @@ class DelayNodeImportService(services.NodeImportService):
 
 class NoLocksNodeImportService(services.NodeImportService):
 
-    async def init_models(self, conn: SAConnection):
-        self._mdl = model.NodeModel(conn, self.node_id)
-        await self.mdl.init()
-        self.import_mdl.release_queue()
+    async def init_repos(self, conn: SAConnection):
+        self._repo = NodeRepository(conn, self.node_id)
+        await self.repo.init()
+        self.import_repo.release_queue()
 
 
 class NoQueueImportService(services.ImportService):
     import_id = 10000
 
     async def acquire_locks(self, conn: SAConnection):
-        await self.import_mdl.lock_ids(self.folder_ids_set | self.files_mdl.ids)
-        await self.import_mdl.lock_branches(self.folder_ids_set, self.files_mdl.ids)
+        await self.import_repo.lock_ids(self.folder_ids_set | self.files_repo.ids)
+        await self.import_repo.lock_branches(self.folder_ids_set, self.files_repo.ids)
         # self.import_mdl.release_queue()
 
     async def execute_post_import(self):
         async with self.pg.transaction() as conn:
-            self._import_mdl = model.ImportModel(conn, self.import_id)
+            self._import_repo = ImportRepository(conn, self.import_id)
             self.__class__.import_id += 1
 
-            await self.init_models(conn)
-            await self.import_mdl.insert_import(self.date)
+            await self.init_repos(conn)
+            await self.import_repo.insert_import(self.date)
             await self._post_import()
 
 
@@ -73,7 +73,7 @@ class DelayImportService(services.ImportService):
 class NoLocksImportService(DelayImportService):
 
     async def acquire_locks(self, conn: SAConnection):
-        self.import_mdl.release_queue()
+        self.import_repo.release_queue()
 
 
 def add_aiohttp_handlers(router: UrlDispatcher):

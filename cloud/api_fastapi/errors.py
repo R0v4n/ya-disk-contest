@@ -8,7 +8,7 @@ from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from cloud.model.exceptions import ModelValidationError, ItemNotFoundError
+from cloud.db.repositories.exceptions import ModelValidationError, ItemNotFoundError
 
 
 logger = logging.getLogger(__name__)

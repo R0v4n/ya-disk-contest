@@ -3,12 +3,12 @@ from typing import Iterable
 
 from asyncpgsa.connection import SAConnection
 
-from cloud.queries import import_queries, FolderQuery, Ids
+from cloud.db.queries import import_queries, FolderQuery, Ids
 from cloud.utils import QueueWorker
-from .base import BaseModel
+from .base import BaseRepository
 
 
-class ImportModel(BaseModel):
+class ImportRepository(BaseRepository):
     __slots__ = ('_import_id',)
 
     def __init__(self, conn: SAConnection, import_id: int | None = None):
@@ -95,7 +95,7 @@ class ImportModel(BaseModel):
 class AcquireLocksContext:
     __slots__ = ('mdl', 'i', '_ids', '_branches_ids')
 
-    def __init__(self, mdl: ImportModel, ids: Ids, i: int = 0):
+    def __init__(self, mdl: ImportRepository, ids: Ids, i: int = 0):
         self.mdl = mdl
         self.i = i
         self._ids = ids

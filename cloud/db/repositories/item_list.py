@@ -4,14 +4,13 @@ from typing import Iterable, Any
 from asyncpg import ForeignKeyViolationError
 from asyncpgsa.connection import SAConnection
 
-from cloud.queries import QueryT, FileQuery, FolderQuery
-from .base import BaseInitModel
-from .exceptions import ParentNotFoundError
-from .node_tree import RequestNodeTree
-from .schemas import ItemType, RequestItem
+from cloud.db.queries import QueryT, FileQuery, FolderQuery
+from .base import BaseInitRepository
+from .exceptions import ParentNotFoundError, ModelValidationError
+from cloud.models import RequestNodeTree, ItemType, RequestItem
 
 
-class ItemListBaseModel(BaseInitModel):
+class ItemListBaseRepository(BaseInitRepository):
     NodeT: ItemType
     Query: type[QueryT]
     field_mapping: dict[str, str]
@@ -48,8 +47,13 @@ class ItemListBaseModel(BaseInitModel):
         else:
             return set()
 
-    async def any_id_exists(self, ids: Iterable[str]):
+    async def any_id_exists(self, ids: str | Iterable[str]) -> bool:
         return await self.conn.fetchval(self.Query.exist(ids))
+
+    async def check_ids_not_exist(self, ids: str | Iterable[str]) -> None:
+        exist = await self.any_id_exists(ids)
+        if exist:
+            raise ModelValidationError(f'Some ids already exists in {self.__class__.__name__}')
 
     async def insert_new(self, import_id: int):
         if self.new_ids:
@@ -81,7 +85,7 @@ class ItemListBaseModel(BaseInitModel):
                 raise ParentNotFoundError(err.detail or '')
 
 
-class FileListModel(ItemListBaseModel):
+class FileListRepository(ItemListBaseRepository):
     NodeT = ItemType.FILE
     Query = FileQuery
     field_mapping = {
@@ -105,7 +109,7 @@ class FileListModel(ItemListBaseModel):
             await self.conn.execute(insert_hist)
 
 
-class FolderListModel(ItemListBaseModel):
+class FolderListRepository(ItemListBaseRepository):
     NodeT = ItemType.FOLDER
     Query = FolderQuery
     field_mapping = {

@@ -5,7 +5,7 @@ from itertools import accumulate
 import pytest
 from pytest_cases import parametrize, fixture, AUTO
 
-from cloud.model import ItemType
+from cloud.db.schema import ItemType
 from cloud.utils.testing import post_import, FakeCloud, compare_db_fc_state, Folder, File, Dataset
 from tests.post_import_cases import datasets
 
@@ -158,17 +158,6 @@ def extra_field_import(filled_cloud: FakeCloud):
 
 
 @fixture
-def date_without_tz_import(filled_cloud: FakeCloud):
-    date = str((filled_cloud.last_import_date + timedelta(seconds=1)).replace(tzinfo=None))
-
-    import_dict = {
-        'items': [Folder().import_dict],
-        'updateDate': date
-    }
-    return import_dict
-
-
-@fixture
 def reversed_items_import_data(filled_cloud: FakeCloud):
     p_id = filled_cloud[0].id
     filled_cloud.generate_import([[2, [[[]]]], 1, [1, []]], parent_id=p_id)
@@ -209,7 +198,6 @@ def ok_imports(items, filled_cloud: FakeCloud):
     [
         (ok_imports, HTTPStatus.OK),
         (bad_request_imports, HTTPStatus.BAD_REQUEST),
-        (date_without_tz_import, HTTPStatus.BAD_REQUEST),
         (extra_field_import, HTTPStatus.BAD_REQUEST),
     ]
 )

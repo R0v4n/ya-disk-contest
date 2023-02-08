@@ -3,8 +3,10 @@ from typing import Iterable
 
 from deepdiff import DeepDiff
 from sqlalchemy.engine import Connection
-from cloud.model import ItemType
-from cloud.db.schema import imports_table, folders_table, files_table, folder_history, file_history
+from cloud.db.schema import (
+    imports_table, folders_table, files_table,
+    folder_history, file_history, ItemType
+)
 from .fake_cloud import FakeCloud
 
 __all__ = (

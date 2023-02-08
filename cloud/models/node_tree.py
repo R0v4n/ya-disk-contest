@@ -7,6 +7,7 @@ from .schemas import RequestItem, ItemType, ResponseItem, Item
 
 
 class NodeTree(Item):
+    children: list[NodeTree] | None = None
 
     @classmethod
     def from_records(cls, records: Iterable[Mapping[str, Any]]) -> list[NodeTreeT]:
@@ -39,11 +40,13 @@ NodeTreeT = TypeVar('NodeTreeT', bound=NodeTree)
 
 
 class ResponseNodeTree(ResponseItem, NodeTree):
-    children: list[ResponseNodeTree] | None = None
+    """
+    We would never break the chain...
+    Chaaain... Keep us together...
+    """
 
 
 class RequestNodeTree(RequestItem, NodeTree):
-    children: list[RequestNodeTree] | None = None
 
     def flatten_nodes(self, import_id: int) -> list[dict[str, Any]]:
         """
@@ -52,11 +55,10 @@ class RequestNodeTree(RequestItem, NodeTree):
         Any child always will be after his parent.
         """
 
-        def get_dict(node: RequestNodeTree):
+        def get_dict(node):
             yield node.db_dict(import_id)
             if node.children:
                 for child in node.children:
                     yield from get_dict(child)
 
         return list(get_dict(self))
-

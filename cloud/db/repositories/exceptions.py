@@ -2,10 +2,6 @@ class ModelError(Exception):
     status_code = 500
 
 
-class NotInitializedError(ModelError):
-    pass
-
-
 class ItemNotFoundError(ModelError):
     status_code = 404
 

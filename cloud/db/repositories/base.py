@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from asyncpgsa.connection import SAConnection
 
 
-class BaseModel(ABC):
+class BaseRepository(ABC):
     __slots__ = '_conn',
 
     def __init__(self, conn: SAConnection):
@@ -14,7 +14,7 @@ class BaseModel(ABC):
         return self._conn
 
 
-class BaseInitModel(BaseModel):
+class BaseInitRepository(BaseRepository):
     __slots__ = ()
 
     @abstractmethod

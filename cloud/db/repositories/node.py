@@ -4,12 +4,12 @@ from asyncpg import Record
 from asyncpgsa.connection import SAConnection
 
 from cloud.db.schema import ItemType
-from cloud.queries import QueryT, FileQuery, FolderQuery
-from .base import BaseInitModel
+from cloud.db.queries import QueryT, FileQuery, FolderQuery
+from .base import BaseInitRepository
 from .exceptions import ItemNotFoundError, ModelValidationError
 
 
-class NodeModel(BaseInitModel):
+class NodeRepository(BaseInitRepository):
 
     def __init__(self, conn: SAConnection, node_id: str):
         super().__init__(conn)

@@ -4,7 +4,7 @@ from itertools import accumulate
 import pytest
 from pytest_cases import parametrize_with_cases, unpack_fixture
 
-from cloud.model import ItemType
+from cloud.db.schema import ItemType
 from cloud.utils.testing import FakeCloud, Dataset, compare
 from tests import get_node_cases
 from tests.post_import_cases import datasets

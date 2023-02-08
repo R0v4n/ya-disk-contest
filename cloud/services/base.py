@@ -6,9 +6,8 @@ from typing import Coroutine
 from asyncpgsa import PG
 from asyncpgsa.connection import SAConnection
 
-from cloud.model import NodeModel, ImportModel
+from cloud.db.repositories import NodeRepository, ImportRepository
 from cloud.utils import QueueWorker
-from cloud.model.exceptions import ModelValidationError
 
 
 logger = logging.getLogger(__name__)
@@ -26,19 +25,19 @@ class BaseService(ABC):
         return self._pg
 
     @abstractmethod
-    async def init_models(self, conn: SAConnection | PG):
-        """create and init models"""
+    async def init_repos(self, conn: SAConnection | PG):
+        """create and init repositories"""
 
 
 class BaseImportService(BaseService):
 
-    __slots__ = ('_date', '_import_mdl')
+    __slots__ = ('_date', '_import_repo')
 
     def __init__(self, pg: PG, date: datetime, *args):
         super().__init__(pg, *args)
 
         self.date = date
-        self._import_mdl = None
+        self._import_repo = None
 
     @property
     def date(self) -> datetime:
@@ -46,24 +45,22 @@ class BaseImportService(BaseService):
 
     @date.setter
     def date(self, date: datetime):
-        if date.tzinfo is None:
-            raise ModelValidationError
         self._date = date
 
     @property
-    def import_mdl(self) -> ImportModel:
-        return self._import_mdl
+    def import_repo(self) -> ImportRepository:
+        return self._import_repo
 
     @abstractmethod
-    async def init_models(self, conn: SAConnection):
-        await super().init_models(conn)
+    async def init_repos(self, conn: SAConnection):
+        await super().init_repos(conn)
 
     async def _execute_in_import_transaction(self, coro: Coroutine):
         async with QueueWorker(self._date) as qw:
             async with self.pg.transaction() as conn:
-                self._import_mdl = ImportModel(conn, qw.queue_id)
-                await self.init_models(conn)
-                await self.import_mdl.insert_import(self.date)
+                self._import_repo = ImportRepository(conn, qw.queue_id)
+                await self.init_repos(conn)
+                await self.import_repo.insert_import(self.date)
 
                 await coro
 
@@ -73,13 +70,13 @@ class BaseNodeService(BaseService):
     def __init__(self, pg: PG, node_id: str, *args):
         super().__init__(pg, *args)
         self.node_id = node_id
-        self._mdl = None
+        self._repo = None
 
     @property
-    def mdl(self) -> NodeModel:
-        return self._mdl
+    def repo(self) -> NodeRepository:
+        return self._repo
 
-    async def init_models(self, conn: SAConnection | PG):
-        await super().init_models(conn)
-        self._mdl = NodeModel(conn, self.node_id)
-        await self.mdl.init()
+    async def init_repos(self, conn: SAConnection | PG):
+        await super().init_repos(conn)
+        self._repo = NodeRepository(conn, self.node_id)
+        await self.repo.init()

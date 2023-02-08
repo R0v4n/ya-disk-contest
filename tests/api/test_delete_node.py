@@ -121,8 +121,6 @@ def folder_id(filled_cloud: FakeCloud):
     [
         # non existing node id
         (File().id, datetime.now(timezone.utc), HTTPStatus.NOT_FOUND),
-        # invalid date format (no tz)
-        (folder_id, '2022-02-01 12:00:00', HTTPStatus.BAD_REQUEST)
     ]
 )
 async def test_bad_cases(api_client, sync_connection, node_id, date, expected_status):

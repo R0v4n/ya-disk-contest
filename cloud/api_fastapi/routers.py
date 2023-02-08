@@ -6,7 +6,7 @@ from fastapi import APIRouter, status, Request, Depends
 from fastapi.responses import Response, ORJSONResponse
 from makefun import wraps
 
-from cloud import model
+from cloud import models
 from cloud.resources import url_paths
 from cloud.services import ImportService, NodeService, NodeImportService, HistoryService
 
@@ -30,13 +30,13 @@ def service_depends(service_class):
 
 router = APIRouter(
     responses={
-        status.HTTP_400_BAD_REQUEST: {'model': model.Error},
+        status.HTTP_400_BAD_REQUEST: {'model': models.Error},
     }
 )
 
 node_router = APIRouter(
     responses={
-        status.HTTP_404_NOT_FOUND: {'model': model.Error},
+        status.HTTP_404_NOT_FOUND: {'model': models.Error},
     }
 )
 
@@ -58,7 +58,7 @@ async def delete_node(service: NodeImportService = service_depends(NodeImportSer
 
 @node_router.get(
     url_paths.GET_NODE,
-    response_model=model.ResponseNodeTree,
+    response_model=models.ResponseNodeTree,
     response_class=ORJSONResponse
 )
 async def node_tree(service: NodeService = service_depends(NodeService)):
@@ -68,7 +68,7 @@ async def node_tree(service: NodeService = service_depends(NodeService)):
 
 @router.get(
     url_paths.GET_UPDATES,
-    response_model=model.ListResponseItem,
+    response_model=models.ListResponseItem,
     response_class=ORJSONResponse
 )
 async def updates(service: HistoryService = service_depends(HistoryService)):
@@ -79,7 +79,7 @@ async def updates(service: HistoryService = service_depends(HistoryService)):
 # noinspection PyPep8Naming
 @node_router.get(
     url_paths.GET_NODE_HISTORY,
-    response_model=model.ListResponseItem,
+    response_model=models.ListResponseItem,
     response_class=ORJSONResponse
 )
 async def node_history(

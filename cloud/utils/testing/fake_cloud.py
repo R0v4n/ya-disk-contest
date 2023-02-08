@@ -10,7 +10,7 @@ import faker
 import pydantic as pdt
 from orjson import orjson
 
-from cloud.model import ItemType
+from cloud.db.schema import ItemType
 
 fake = faker.Faker(use_weighting=False)
 rnd = fake.random
