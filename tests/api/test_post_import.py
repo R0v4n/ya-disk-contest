@@ -5,8 +5,8 @@ from itertools import accumulate
 import pytest
 from pytest_cases import parametrize, fixture, AUTO
 
-from cloud.db.schema import ItemType
-from cloud.utils.testing import post_import, FakeCloud, compare_db_fc_state, Folder, File, Dataset
+from disk.db.schema import ItemType
+from disk.utils.testing import post_import, FakeCloud, compare_db_fc_state, Folder, File, Dataset
 from tests.post_import_cases import datasets
 
 stairway_datasets = list(accumulate(datasets, lambda s, x: s + [x], initial=[]))

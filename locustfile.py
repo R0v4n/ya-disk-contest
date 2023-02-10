@@ -6,8 +6,8 @@ from random import choice, uniform, randint
 from locust import task, FastHttpUser, constant, events
 from locust.runners import MasterRunner
 
-from cloud.resources import url_paths
-from cloud.utils.testing import FakeCloudGen, url_for, Folder
+from disk.resources import url_paths
+from disk.utils.testing import FakeCloudGen, url_for, Folder
 
 
 @events.test_start.add_listener

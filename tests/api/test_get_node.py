@@ -3,7 +3,7 @@ from http import HTTPStatus
 import pytest
 from pytest_cases import parametrize_with_cases
 
-from cloud.utils.testing import get_node, File, direct_import_to_db, Dataset, compare
+from disk.utils.testing import get_node, File, direct_import_to_db, Dataset, compare
 from tests import get_node_cases
 
 

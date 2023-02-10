@@ -11,14 +11,14 @@ from fastapi import APIRouter
 from httpx import AsyncClient
 from starlette.responses import Response
 
-from cloud.db.repositories import NodeRepository, ImportRepository
-from cloud import services
-from cloud.api_fastapi.app import create_app as create_fastapi_app
-from cloud.api_fastapi.routers import service_depends
-from cloud.api_aiohttp.app import create_app as create_aiohttp_app
-from cloud.api_aiohttp.handlers import ImportsView, DeleteNodeView
-from cloud.resources import url_paths
-from cloud.utils.testing import (
+from disk.db.repositories import NodeRepository, ImportRepository
+from disk import services
+from disk.api_fastapi.app import create_app as create_fastapi_app
+from disk.api_fastapi.routers import service_depends
+from disk.api_aiohttp.app import create_app as create_aiohttp_app
+from disk.api_aiohttp.handlers import ImportsView, DeleteNodeView
+from disk.resources import url_paths
+from disk.utils.testing import (
     post_import, del_node,
     compare_db_fc_state, Folder, FakeCloudGen
 )

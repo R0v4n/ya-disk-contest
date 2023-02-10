@@ -28,8 +28,8 @@ dynamic = ["dependencies", "optional-dependencies"]
 
 
 [project.scripts]
-disk-api = "cloud.__main__:main"
-disk-db = "cloud.db.__main__:main"
+disk-api = "disk.__main__:main"
+disk-db = "disk.db.__main__:main"
 
 
 [tool.setuptools.dynamic]

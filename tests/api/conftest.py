@@ -2,8 +2,8 @@ import pytest
 from alembic.command import upgrade
 from sqlalchemy import create_engine
 
-from cloud.settings import Settings
-from cloud.utils.testing.test_client_factory import aiohttp_client_factory, fastapi_client_factory
+from disk.settings import Settings
+from disk.utils.testing.test_client_factory import aiohttp_client_factory, fastapi_client_factory
 
 
 @pytest.fixture

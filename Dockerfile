@@ -14,6 +14,6 @@ FROM snakepacker/python:3.10 as api
 
 COPY --from=builder /usr/share/python3/app /usr/share/python3/app
 
-RUN ln -snf /usr/share/python3/app/bin/cloud-* /usr/local/bin/
+RUN ln -snf /usr/share/python3/app/bin/disk-* /usr/local/bin/
 
-CMD cloud-api fastapi
+CMD disk-api fastapi

@@ -2,7 +2,7 @@ from datetime import timedelta
 
 import pytest
 
-from cloud.utils.testing import post_import, FakeCloud, get_updates, get_node_history, compare
+from disk.utils.testing import post_import, FakeCloud, get_updates, get_node_history, compare
 
 
 @pytest.fixture(scope='module')

@@ -4,7 +4,7 @@ from http import HTTPStatus
 import pytest
 from pytest_cases import parametrize_with_cases, parametrize
 
-from cloud.utils.testing import post_import, FakeCloud, del_node, compare_db_fc_state, File
+from disk.utils.testing import post_import, FakeCloud, del_node, compare_db_fc_state, File
 
 
 @pytest.fixture

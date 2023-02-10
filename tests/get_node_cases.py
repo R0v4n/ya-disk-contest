@@ -1,5 +1,5 @@
 """Case functions for pytest-cases. Used for testing API methods and FakeCloud"""
-from cloud.utils.testing import Dataset
+from disk.utils.testing import Dataset
 
 
 def case_folder_tree():

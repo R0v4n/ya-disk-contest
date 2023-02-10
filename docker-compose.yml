@@ -9,7 +9,7 @@ services:
       - "-c"
       - "max_connections=200"
     environment:
-      POSTGRES_DB: "cloud"
+      POSTGRES_DB: "disk"
       POSTGRES_USER: "user"
       POSTGRES_PASSWORD: "psw"
     ports:
@@ -17,10 +17,10 @@ services:
 
   api:
     image: r0van/ya-disk-contest
-    command: cloud-api fastapi
+    command: disk-api fastapi
     ports:
       - "8081:8081"
     environment:
-      CLOUD_PG_POOL_MAX_SIZE: 20
-      CLOUD_PG_DSN: "postgresql://user:psw@db:5432/cloud"
-      CLOUD_SLEEP: 0.01
+      DISK_PG_POOL_MAX_SIZE: 20
+      DISK_PG_DSN: "postgresql://user:psw@db:5432/disk"
+      DISK_SLEEP: 0.01

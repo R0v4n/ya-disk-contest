@@ -5,7 +5,7 @@ from random import randint, shuffle, choice, uniform
 import pytest
 from devtools import debug
 
-from cloud.utils.testing import (
+from disk.utils.testing import (
     post_import, del_node, get_node, get_node_history, get_updates,
     FakeCloudGen, compare_db_fc_state, compare
 )
