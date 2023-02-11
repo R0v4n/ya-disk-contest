@@ -10,7 +10,6 @@ from rich import print
 
 
 def _typer_type(value: Any):
-    """Typer by default handles int, bool, str, Enum and some others"""
     if type(value) in (int, float, bool, str) or isinstance(value, Enum):
         return type(value)
     else:
@@ -41,12 +40,22 @@ def build_typer_parameters(settings_type: type[BaseSettings]) -> list[Parameter]
     ]
 
 
+def get_settings_type(func: Callable[[BaseSettings], Any]) -> type[BaseSettings]:
+    anno_types = tuple(get_annotations(func).values())
+
+    if len(anno_types) != 1 or not issubclass(anno_types[0], BaseSettings):
+        raise ValueError('The wrapped function must have exactly '
+                         'one argument annotated with BaseSettings subtype')
+
+    return anno_types[0]
+
+
 def typer_entry_point(func: Callable[[BaseSettings], Any]):
     """
     Transforms function signature for typer, validates values received from env and cli with pydantic.
 
     Decorated function should have exactly one argument annotated with BaseSettings subtype.
-    Each BaseSettings field will be an option with default value in cli (e.g. myapp --foo-bar).
+    Each BaseSettings field will be an option with default value in cli (e.g. my-command --any-field).
 
     BaseSettings.Config can optionally contain fields:
      - descriptions: list[str], that will be passed to typer.Option "help" argument.
@@ -54,19 +63,13 @@ def typer_entry_point(func: Callable[[BaseSettings], Any]):
 
     Decorated function will receive BaseSettings instance with actual field values
     from env and cli options (or defaults).
-    Also validates values with pydantic model.
+    Also validates values with pydantic.
 
     I'm just imagining how pydantic and typer work together.
     For now, this decorator support only cli options.
     """
 
-    anno_types = tuple(get_annotations(func).values())
-
-    if len(anno_types) != 1 or not issubclass(anno_types[0], BaseSettings):
-        raise ValueError('The wrapped function must have exactly '
-                         'one argument of the BaseSettings subtype')
-
-    SettingsType: type[BaseSettings] = anno_types[0]
+    SettingsType = get_settings_type(func)
 
     @wraps(func, Signature(build_typer_parameters(SettingsType)))
     def wrapper(**kwargs):
@@ -79,64 +82,6 @@ def typer_entry_point(func: Callable[[BaseSettings], Any]):
             func(settings)
 
     return wrapper
-
-
-class TyperEntryPoint:
-    """
-    Class decorator implementation.
-    """
-
-    __slots__ = 'cli_options',
-
-    def __init__(self, cli_options: BaseSettings):
-        """
-        :param cli_options: pydantic model with optional "env_prefix" and "descriptions" Config attrs.
-        """
-        self.cli_options = cli_options
-
-    def __call__(self, func: Callable[[BaseSettings], Any]):
-        """
-        Converting function signature for typer, validating values received from env and cli, run typer.
-        Each cli_options field will be a distinct kw maybe arg with default value in the wrapper signature.
-        """
-
-        @wraps(func, Signature(self.typer_parameters))
-        def wrapper(**kwargs):
-            try:
-                settings = self.cli_options.__class__(**kwargs)
-            except ValidationError as err:
-                print(err)
-                raise typer.Abort(1)
-            else:
-                func(settings)
-
-        return wrapper
-
-    @staticmethod
-    def _typer_type(value: Any):
-        """Typer by default handles only int, bool, str, Enum"""
-        if type(value) in (int, bool, str) or isinstance(value, Enum):
-            return type(value)
-        else:
-            return str
-
-    @property
-    def typer_parameters(self):
-        items = self.cli_options.dict().items()
-
-        descriptions = getattr(self.cli_options.Config, 'descriptions', [])
-        env_prefix = getattr(self.cli_options.Config, 'env_prefix', '')
-
-        if len(items) < len(descriptions):
-            raise ValueError
-
-        return [
-            Parameter(
-                key, kind=Parameter.POSITIONAL_OR_KEYWORD,
-                default=typer.Option(val, help=descr, envvar=env_prefix + key.upper()),
-                annotation=self._typer_type(val)
-            ) for (key, val), descr in zip_longest(items, descriptions)
-        ]
 
 
 __all__ = 'typer_entry_point',
